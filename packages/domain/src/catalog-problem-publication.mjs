@@ -25,6 +25,39 @@ const sourceAccess = `p.owner_scope='platform' AND p.archived_at IS NULL AND b.a
  AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=p.id)
  AND ${readyProblemPresentationSql()}`;
 
+// Editorial permission selects a course. Assigning its exercises also requires a
+// published edition that the receiving school can use outside the course.
+const assignmentSourceAccess = `${sourceAccess}
+ AND NOT v.course_only_published AND v.rank_review_status='approved' AND v.school_visible_at IS NOT NULL
+ AND (b.school_id=$2 OR EXISTS (SELECT 1 FROM school_problem_publications publication
+   WHERE publication.school_id=b.catalog_scope_id AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL)
+ OR EXISTS (SELECT 1 FROM platform_problem_audiences audience WHERE audience.problem_id=p.id AND audience.school_id=$2))`;
+
+export async function assignmentCatalogOptions(db, schoolId, linkedIds) {
+ if (!linkedIds.length) return [];
+ const {rows} = await db.query(`SELECT p.id AS "problemId",v.id AS "versionId",v.title,v.mode,
+   coalesce(presentation.metadata,v.metadata)->>'difficulty' AS difficulty,'platform' AS "bankId",'CodeMaster' AS "bankName"
+   FROM ${sourceTables} LEFT JOIN problem_public_statements presentation ON presentation.version_id=v.id
+   WHERE p.id=ANY($1::uuid[]) AND ${assignmentSourceAccess} ORDER BY v.title,p.id`, [linkedIds,schoolId]);
+ return rows;
+}
+
+export async function prepareAssignmentEdition(db, schoolId, {problemId,versionId}) {
+ const {rows} = await db.query(`SELECT ${sourceColumns} FROM ${sourceTables}
+   WHERE p.id=$1 AND v.id=$3 AND ${assignmentSourceAccess} FOR SHARE OF p,b,v`, [problemId,schoolId,versionId]);
+ const [source] = await studentPublicStatementRows(db,rows);
+ if (!source || source.public_statement_pending) fail(404,'PROBLEM_UNAVAILABLE','所选平台题目版本不可布置，请刷新题目列表。');
+ await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[problemId]);
+ // The caller already scoped this transaction to the assignment's school.
+ // An activity pin must never update an existing edition or publish into a school bank.
+ const stored = await db.query(`SELECT b.resource_kind,EXISTS(SELECT 1 FROM school_problem_versions v
+   WHERE (v.school_id,v.problem_id,v.id)=(p.school_id,p.id,$3)) AS pinned FROM school_problems p
+   JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id) WHERE p.school_id=$1 AND p.id=$2`,
+   [schoolId,problemId,versionId]);
+ if (stored.rows[0] && stored.rows[0].resource_kind!=='publication') fail(409,'PROBLEM_ID_CONFLICT','题目标识已在本校使用。');
+ if (!stored.rows[0]?.pinned) await writeSnapshot(db,source,{activate:false,storageId:schoolId});
+}
+
 // Serialize platform audience edits with readers of the same source banks.
 export async function lockCatalogProblemSchools(db, problemIds, {shared=false}={}) {
  const {rows}=await db.query(`SELECT DISTINCT b.catalog_scope_id AS school_id FROM problems p JOIN problem_banks b ON b.id=p.bank_id
@@ -165,7 +198,7 @@ export async function previewCatalogPublicProblem(db, problemId) {
  };
 }
 
-async function writeSnapshot(db, source, { activate = true } = {}) {
+async function writeSnapshot(db, source, { activate = true, storageId = source.school_id } = {}) {
  const { rows } = await db.query(`SELECT position,input,expected,weight FROM test_cases
   WHERE version_id=$1 AND enabled ORDER BY position`, [source.id]);
  const definition = {
@@ -187,19 +220,19 @@ async function writeSnapshot(db, source, { activate = true } = {}) {
  }
  await db.query(`INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id,resource_kind)
   VALUES($1,$2,$3,'Public practice',$2,'publication') ON CONFLICT(school_id,id) DO NOTHING`,
- [source.school_id, snapshotBankId, source.owner_account_id]);
+ [storageId, snapshotBankId, source.owner_account_id]);
  await db.query(`INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id)
   VALUES($1,$2,$3,$4,'{}',$2) ON CONFLICT(school_id,id) DO NOTHING`,
- [source.school_id, source.problem_id, snapshotBankId, source.owner_account_id]);
+ [storageId, source.problem_id, snapshotBankId, source.owner_account_id]);
  await db.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
   SELECT $1,$2,$3,COALESCE(max(draft_revision),0)+1,$4 FROM school_problem_versions WHERE school_id=$1 AND problem_id=$3
   ON CONFLICT(school_id,id) DO UPDATE SET definition=EXCLUDED.definition,
    draft_revision=EXCLUDED.draft_revision WHERE school_problem_versions.problem_id=EXCLUDED.problem_id
-   AND school_problem_versions.definition IS DISTINCT FROM EXCLUDED.definition`, [source.school_id, source.id, source.problem_id, JSON.stringify(definition)]);
+   AND school_problem_versions.definition IS DISTINCT FROM EXCLUDED.definition`, [storageId, source.id, source.problem_id, JSON.stringify(definition)]);
  if(activate) await db.query(`UPDATE school_problems p SET published=true,published_version_id=v.id,
   revision=v.draft_revision,updated_at=clock_timestamp()
   FROM school_problem_versions v WHERE p.school_id=$1 AND p.id=$2
-   AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=$3`, [source.school_id, source.problem_id, source.id]);
+   AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=$3`, [storageId, source.problem_id, source.id]);
 }
 
 // The platform operation owns the exclusive school lock and RLS scope.

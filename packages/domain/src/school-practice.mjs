@@ -1,3 +1,4 @@
+import { lockPlatformContent } from './platform-content-access.mjs';
 import { schoolBankDirectory } from './school-bank-directory.mjs';
 import { ownSchoolReceipt, receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
 import { problemProgress } from './problem-progress.mjs';
@@ -481,6 +482,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  });
  if(route==='/platform/problem-publications'||/^\/platform\/problem-publications\/[^/]+(?:\/(withdraw|reject))?$/.test(route))return transaction(pool,async db=>{
   await activeAccount(db,user.id);if(!await isPlatformAdministrator(db,user.id))fail(403,'FORBIDDEN','Platform administrator required.');
+  if(method==='POST') await lockPlatformContent(db);
   if(method==='GET'&&route!=='/platform/problem-publications'){
    const schoolId=uuid(url.searchParams.get('schoolId')),problemId=uuid(route.split('/')[3]);await scope(db,schoolId);
    if (await hasCatalogSource(db,schoolId,problemId)) return reply(await previewCatalogPublicProblem(db,problemId));

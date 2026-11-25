@@ -1057,6 +1057,7 @@ export function ProblemPicker({
           }}
         >
           <option value="">{tr("全部题库", "All banks")}</option>
+          {schoolProblems?.some(p => p.bankId === "platform") && <option value="platform">CodeMaster</option>}
           {banks.data?.items.filter((x) => !courseMode || x.visibility === "school").map((x) => (
             <option key={x.id} value={x.id}>
               {x.name}

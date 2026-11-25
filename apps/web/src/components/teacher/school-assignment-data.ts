@@ -9,6 +9,7 @@ import type { TeacherAssignment } from "./dashboard-classes";
 
 export type SchoolAssignmentOptions = ActivityOptions & {
   firstAcPoints: number;
+  platformProblems: ActivityOptions["problems"];
   courses: {
     id: string;
     title: string;

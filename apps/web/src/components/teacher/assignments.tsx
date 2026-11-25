@@ -322,6 +322,11 @@ function AssignmentEditorForm({
   } : legacyRule;
   const legacyOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(!schoolId && coursePathId ? `learning-paths/${coursePathId}?purpose=assignment` : null);
   const linked = options.data?.courses.find(c=>c.id===coursePathId);
+  const linkedPlatformIds = new Set(linked?.scope === "platform" ? linked.problemIds : []);
+  const pickerProblems = options.data && [
+    ...options.data.problems,
+    ...(options.data.platformProblems ?? []).filter(p => linkedPlatformIds.has(p.problemId)),
+  ];
   const courseOutline = schoolId ? {...options,data:linked && {...linked, chapters:[{problems:linked.problemIds.map(problemId=>({problemId}))}]}} : legacyOutline;
   const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId) && (!schoolId || !!linked || options.loading);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;
@@ -1134,7 +1139,7 @@ function AssignmentEditorForm({
       {importing && schoolId && <SchoolAssignmentProblemImport schoolId={schoolId} onClose={()=>setImporting(false)}/>}
       {picker && courseOrderReady && (
         <ProblemPicker
-          forAssignment schoolId={schoolId} schoolProblems={schoolId ? options.data?.problems.map(p=>({
+          forAssignment schoolId={schoolId} schoolProblems={schoolId ? pickerProblems?.map(p=>({
             id:p.problemId,title:p.title,mode:p.mode,published:true,publishedVersionId:p.versionId,bankId:p.bankId,bankName:p.bankName,
             firstAcPoints:options.data?.firstAcPoints,publishedDifficulty:p.difficulty,
           })) : undefined}

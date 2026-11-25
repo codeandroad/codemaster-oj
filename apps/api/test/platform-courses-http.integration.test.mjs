@@ -247,6 +247,83 @@ test('platform courses retain original data and enforce audiences through NestJS
     assert.equal((await a.send(path)).grade.score,20);
    });
   });
+  await t.test('a school teacher assigns the actual platform exercise from the granted Python training course',async t=>{
+   assert.equal(first.p.title,'Python 专项训练 · 全目录学习路线');
+   const path=`/schools/${LEGACY_SCHOOL_ID}/activities`,options=path+'/options?view=assignment';
+   const grantPath=`/platform/content-editors/course/${first.p.id}`;
+   const grant={accountId:actors['school-teacher'].id,schoolId:LEGACY_SCHOOL_ID};
+   const pin={problemId:problem.id,versionId:version.id,points:30};
+   const create={kind:'assignment',audienceMode:'selected',title:'Granted Python exercise',courseId:first.p.id,
+    identityIds:[actors['student-a'].identityId,actors['student-b'].identityId],problems:[pin]};
+   const draft=(changes={},status=201)=>teacher.send(path,{...create,...changes,requestId:randomUUID()},'POST',status);
+   const discover=async()=> (await teacher.send(options)).platformProblems.find(p=>p.problemId===problem.id);
+   assert.equal(await discover(),undefined);
+   await draft({},409);
+   await platform.send(grantPath,grant);
+   const candidate=await discover();
+   assert.equal(candidate.versionId,version.id);assert.equal(candidate.title,version.title);
+   assert.ok(!JSON.stringify(candidate).includes('secret-case'));
+   assert.equal(candidate.referenceCode,undefined);
+   assert.equal((await teacher.send(options)).problems.some(p=>p.problemId===problem.id),false);
+   await draft({courseId:null},404);
+   await draft({problems:[{...pin,versionId:historical.version.id}]},404);
+   await draft({problems:[{...pin,problemId:historical.problem.id,versionId:historical.version.id}]},404);
+   const sourcePath='/platform/courses/'+first.p.id,source=await platform.send(sourcePath);
+   const restricted=await platform.send(sourcePath,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,
+    audienceScope:'students',studentIds:[actors['student-a'].identityId]},'PATCH');
+   const saved=await draft(),activity=path+'/'+saved.id;
+   assert.deepEqual(saved.problems.map(p=>[p.id,p.versionId]),[[problem.id,version.id]]);
+   const revised=await teacher.send(activity,{...create,expectedRevision:saved.revision},'PATCH');
+   const publish={expectedRevision:revised.revision};
+   await pool.query('DELETE FROM chapter_problems WHERE chapter_id=$1 AND problem_id=$2',[first.c.id,problem.id]);
+   assert.equal(await discover(),undefined);
+   await teacher.send(activity+'/publish',publish,'POST',404);
+   await pool.query(pinChapter,[first.c.id,problem.id,version.id,0]);
+   await platform.send(grantPath,grant,'DELETE');
+   assert.equal(await discover(),undefined);
+   await teacher.send(activity+'/publish',publish,'POST',409);
+   await platform.send(grantPath,grant);
+   await teacher.send(activity+'/publish',publish);
+   await platform.send(grantPath,grant,'DELETE');
+   assert.equal((await a.send(activity)).courseId,first.p.id);
+   assert.equal((await b.send(activity)).courseId,null);
+   await b.send('/practice/courses/'+first.p.id,undefined,'GET',404);
+   const exercise=await b.send(activity+'/problems/'+problem.id);
+   assert.equal(exercise.versionId,version.id);
+   assert.ok(!JSON.stringify(exercise).includes('secret-case'));
+   await t.test('an assigned student earns 30 points using the platform edition in the isolated judge',{skip:!process.env.GO_JUDGE_TEST_URL},async()=>{
+    const job=await b.send(activity+'/problems/'+problem.id+'/submissions',{kind:'submit',language:'python',code:'print(input())',requestId:randomUUID()},'POST',202);
+    await gradeNext();
+    assert.equal((await b.send(activity+'/jobs/'+job.id)).status,'AC');
+    assert.equal((await b.send(activity)).grade.score,30);
+   });
+   await platform.send(sourcePath,{expectedRevision:restricted.revision,sourceVersion:restricted.sourceVersion,audienceScope:'all'},'PATCH');
+
+   // A grant in another school cannot export a source-school-only edition. An
+   // explicit release to that school permits an activity pin, never a library copy.
+   const remoteGrant={...grant,schoolId:alpha.id},remote=`/schools/${alpha.id}/activities`;
+   const remoteOptions=async()=> (await teacher.send(remote+'/options?view=assignment')).platformProblems;
+   await platform.send(grantPath,remoteGrant);
+   assert.equal(await discover(),undefined);
+   assert.ok(!(await remoteOptions()).some(p=>p.problemId===problem.id));
+   const remoteDraft=()=>({...create,identityIds:[],requestId:randomUUID()});
+   await teacher.send(remote,remoteDraft(),'POST',404);
+   const audience={problemIds:[problem.id],targets:[{kind:'school',id:alpha.id}]};
+   await platform.send('/platform/problem-audiences',{...audience,operation:'grant'});
+   assert.ok((await remoteOptions()).some(p=>p.problemId===problem.id && p.versionId===version.id));
+   const remoteSaved=await teacher.send(remote,remoteDraft(),'POST',201);
+   assert.equal(remoteSaved.problems[0].versionId,version.id);
+   const copy=(await pool.query(`SELECT b.resource_kind,p.published,v.definition FROM school_problems p
+     JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id)
+     JOIN school_problem_versions v ON (v.school_id,v.problem_id)=(p.school_id,p.id)
+     WHERE p.school_id=$1 AND p.id=$2 AND v.id=$3`,[alpha.id,problem.id,version.id])).rows[0];
+   assert.equal(copy.resource_kind,'publication');assert.equal(copy.published,false);
+   assert.equal(copy.definition.reference_code,undefined);
+   await platform.send('/platform/problem-audiences',{...audience,operation:'revoke'});
+   assert.ok(!(await remoteOptions()).some(p=>p.problemId===problem.id));
+   await teacher.send(remote+'/'+remoteSaved.id+'/publish',{expectedRevision:remoteSaved.revision},'POST',404);
+   await platform.send(grantPath,remoteGrant,'DELETE');
+  });
   await t.test('a legacy school administrator can assign a granted platform course without changing its learner audience',async t=>{
    const root=`/schools/${LEGACY_SCHOOL_ID}`;
    async function register(name){
@@ -287,7 +364,10 @@ test('platform courses retain original data and enforce audiences through NestJS
     VALUES($1,'Restricted exercise','Private prompt','stdio',1000,128,'print(input())','AC',now(),true) RETURNING id`,[privateProblem.id])).rows[0];
    await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[privateProblem.id,privateVersion.id]);
    await platform.send(`/platform/content-editors/problem/${privateProblem.id}`,editor);
-   assert.ok(!(await school.send(options)).problems.some(item=>item.problemId===privateProblem.id));
+   await pool.query(pinChapter,[originals[1].c.id,privateProblem.id,privateVersion.id,2]);
+   const editedOptions=await school.send(options);
+   assert.ok(editedOptions.courses.find(c=>c.id===courseId).problemIds.includes(privateProblem.id));
+   assert.ok(!editedOptions.platformProblems.some(item=>item.problemId===privateProblem.id));
    assert.equal((await school.send(activities,{...homework,requestId:randomUUID(),problems:[{...pin,problemId:privateProblem.id,versionId:privateVersion.id}]},'POST',404)).error.code,'PROBLEM_UNAVAILABLE');
 
    const draft=await school.send(activities,{...homework,requestId:randomUUID()},'POST',201);

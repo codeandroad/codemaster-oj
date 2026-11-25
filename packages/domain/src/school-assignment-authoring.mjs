@@ -1,5 +1,5 @@
 import { assignmentPassingProgressSubmission } from './assignment-grades.mjs';
-import { lockPlatformContent, platformContentEditorSql } from './platform-content-access.mjs';
+import { platformContentEditorSql } from './platform-content-access.mjs';
 import { schoolRole } from './schools.mjs';
 import { enumValue, fail, field, uuid } from './security.mjs';
 
@@ -35,7 +35,6 @@ export async function assignmentMetadata(db, activity, user, body) {
     platformCourse = activity.platform_course_id ?? null;
   let language = activity.required_language ?? null;
   if (courseId !== current || (courseId && activity.state === 'Draft')) {
-    if (courseId) await lockPlatformContent(db, { shared: true });
     const [course] = courseId ? await assignmentCourses(db, activity.school_id, user, courseId) : [];
     if (courseId && !course)
       fail(409, 'COURSE_UNAVAILABLE', 'The linked course is unavailable in this school.');
@@ -58,6 +57,7 @@ export async function assignmentMetadata(db, activity, user, body) {
       language,
     ],
   );
+  return platformCourse;
 }
 
 export async function recordedParticipants(db, a) {

@@ -5,6 +5,7 @@ import { Feedback, inputClass, Loading, Modal, useData, useMutation } from "@/co
 import { AppLink } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { ApiError, productionApi } from "@/lib/production-api";
+import { SchoolClassPicker } from "./school-class-picker";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { useSchoolText } from "./school-ui";
 
@@ -65,7 +66,7 @@ type ReviewRecords = {
   records: {id: string; name: string; number: string; classes: string[]; status: "archived" | "linked" | "available"}[];
 };
 type Approval = { identityId: string; verificationMethod?: string } |
-  { createNumber: string; verificationMethod: string; distinctStudent: boolean; recordsVersion: string };
+  { createNumber: string; classIds: string[]; verificationMethod: string; distinctStudent: boolean; recordsVersion: string };
 
 function ReviewDialog({ schoolId, application, onClose, onReviewed }: {
   schoolId: string; application: Application; onClose: () => void; onReviewed: () => void;
@@ -94,19 +95,21 @@ function ReviewDialog({ schoolId, application, onClose, onReviewed }: {
     {application.rosterHint && <p>{t("Applicant’s school details", "申请人提供的线索")} · {application.rosterHint}</p>}
     <Loading resource={{...candidates, loading: candidates.pending || candidates.loading}}>
       {!candidates.error && candidates.data && (candidates.data.version ?
-        <ReviewForm key={candidates.data.version} application={application} matches={candidates.data}
-          recordsHref={schoolWorkspaceHref(schoolId, "identities")} busy={action.busy} decide={decide} /> :
+        <ReviewForm key={candidates.data.version} schoolId={schoolId} application={application} matches={candidates.data}
+          busy={action.busy} decide={decide} /> :
         <p>{t("This application is no longer pending.", "该申请已结束审核。")}</p>)}
     </Loading>
     <Feedback action={action} />
   </Modal>;
 }
 
-function ReviewForm({ application, matches, recordsHref, busy, decide }: {
-  application: Application; matches: ReviewRecords; recordsHref: string; busy: boolean;
+function ReviewForm({ schoolId, application, matches, busy, decide }: {
+  schoolId: string; application: Application; matches: ReviewRecords; busy: boolean;
   decide: (approval?: Approval) => void;
 }) {
   const t = useSchoolText();
+  const recordsHref = schoolWorkspaceHref(schoolId, "identities");
+  const [classIds, setClassIds] = useState<string[]>([]);
   const [choice, setChoice] = useState(application.number ? matches.items[0]?.id ?? "" : "");
   const [creating, setCreating] = useState(application.kind === "student" && !matches.items.length);
   const [number, setNumber] = useState(application.number ?? "");
@@ -120,6 +123,7 @@ function ReviewForm({ application, matches, recordsHref, busy, decide }: {
     ? !!number.trim() && !numberTaken && (!sameName || distinct) : !!selected);
   function switchMode() {
     setCreating(!creating);
+    setClassIds([]);
     setDistinct(false);
     setVerification("");
   }
@@ -130,7 +134,7 @@ function ReviewForm({ application, matches, recordsHref, busy, decide }: {
     event.preventDefault();
     if (!canApprove || busy) return;
     if (creating && matches.version) {
-      decide({createNumber: number.trim(), verificationMethod: verification, distinctStudent: distinct, recordsVersion: matches.version});
+      decide({createNumber: number.trim(), classIds, verificationMethod: verification, distinctStudent: distinct, recordsVersion: matches.version});
     } else if (selected) {
       decide({identityId: selected.id, verificationMethod: needsVerification ? verification : undefined});
     }
@@ -154,6 +158,10 @@ function ReviewForm({ application, matches, recordsHref, busy, decide }: {
           <input type="checkbox" name="distinctStudent" checked={distinct} onChange={e => setDistinct(e.target.checked)} />
           {t("I checked the same-name records above. Each belongs to a different student from this applicant.", "我已核对以上同名档案，确认均不属于申请人。")}
         </label>}
+        {!numberTaken && <fieldset className="space-y-2">
+          <legend className="text-sm font-semibold">{t("Student classes (optional)", "所在班级（可选）")}</legend>
+          <SchoolClassPicker schoolId={schoolId} selected={classIds} onChange={setClassIds} />
+        </fieldset>}
       </> : <>
         {!application.number && <label className="block">{t("Same-name school records", "本校同名档案")}
           <select className={inputClass} name="identityId" value={choice} onChange={e => { setChoice(e.target.value); setVerification(""); }}>

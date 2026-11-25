@@ -247,6 +247,56 @@ test('school claims and reviewed applications stay within each school on the rea
         assert.equal((await pool.query("SELECT status FROM school_join_requests WHERE id=$1",[paused.id])).rows[0].status,'pending');
       });
 
+      await t.test('inline approval assigns selected local classes atomically and never replays later roster changes', async () => {
+        const classes = school => '/schools/'+school.id+'/classes';
+        async function createClass(school, admin, name) {
+          const response = await post(classes(school), admin, {name, type:'training'});
+          assert.equal(response.status, 201);
+          return response.data.id;
+        }
+        const a = await createClass(alpha, alphaAdmin, 'Class A');
+        const b = await createClass(alpha, alphaAdmin, 'Class B');
+        const closed = await createClass(alpha, alphaAdmin, 'Archived class');
+        const outside = await createClass(beta, betaAdmin, 'Class A');
+        const applicant = await registerPersonal(request, 'student-for-classes', password);
+        const submission = await post(path(alpha), applicant, {kind:'student', name:'Class Learner', rosterHint:'Class A'});
+        const review = path(alpha)+'/'+submission.data.id;
+        const {data:records} = await request(review+'/candidates', {auth:alphaAdmin});
+        const approve = (classIds, admin = alphaAdmin) => post(review+'/decision', admin, {
+          decision:'approved', createNumber:'C-001', verificationMethod:'in_person', recordsVersion:records.version, classIds,
+        });
+        assert.equal((await post(classes(alpha)+'/'+closed+'/archive', alphaAdmin, {expectedRevision:1})).status, 200);
+        for (const [invalid, status] of [[[a,outside],404], [[a,closed],409], [[a,'bad-id'],400], [null,400]]) {
+          assert.equal((await approve(invalid)).status, status);
+        }
+        assert.equal((await approve([a,b], betaAdmin)).status, 404);
+        assert.equal((await approve([a,b], applicant)).status, 404);
+        assert.equal((await post(review+'/decision',alphaAdmin,{decision:'rejected',classIds:[a]})).status,400);
+        assert.equal((await post(review+'/decision',alphaAdmin,{decision:'approved',identityId:local.id,classIds:[a]})).status,400);
+        assert.equal((await list()).some(r => r.id === submission.data.id), true);
+        assert.deepEqual((await request('/schools',{auth:applicant})).data.items, []);
+        assert.equal((await pool.query("SELECT id FROM school_identities WHERE school_id=$1 AND number='C-001'", [alpha.id])).rowCount, 0);
+
+        const decisions = await Promise.all([approve([b,a,a.toUpperCase()]), approve([a,b])]);
+        assert.deepEqual(decisions.map(r => r.status), [200,200]);
+        assert.equal((await approve([a])).status, 409);
+        const assigned = async () => (await request(classes(alpha),{auth:applicant})).data.items.map(c => c.id).sort();
+        assert.deepEqual(await assigned(), [a,b].sort());
+        const {rows:[record]} = await pool.query('SELECT identity_id FROM school_join_requests WHERE id=$1', [submission.data.id]);
+        for (const classId of [a,b]) {
+          const classroom = await request(classes(alpha)+'/'+classId, {auth:applicant});
+          assert.deepEqual(classroom.data.members.map(person => person.id), [record.identity_id]);
+        }
+        const {rowCount} = await pool.query("SELECT 1 FROM school_audit_events WHERE action='school.roster.add' AND target_id=$1",[record.identity_id]);
+        assert.equal(rowCount, 2);
+        const change = await request('/schools/'+alpha.id+'/identities/'+record.identity_id+'/classes', {
+          method:'PATCH', auth:alphaAdmin, body:{expectedClassIds:[a,b], classIds:[a]},
+        });
+        assert.equal(change.status, 200);
+        assert.equal((await approve([b,a])).status, 200);
+        assert.deepEqual(await assigned(), [a]);
+      });
+
       // Members who previously used a general invitation can finish linking their original dossier.
       await seedUnlinkedMembership(pool,beta.id,another.data.user.id,'student');
       const memberFacts={kind:'student',name:'Previous member',number:'S003'};

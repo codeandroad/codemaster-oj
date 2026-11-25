@@ -1,6 +1,6 @@
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
-import { insertSchoolIdentity } from './school-identity-record.mjs';
+import { insertSchoolIdentity, readClassIds } from './school-identity-record.mjs';
 import { canonicalHash, enumValue, fail, field, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
@@ -74,7 +74,7 @@ async function reviewMatches(db, schoolId, request) {
   return { items, records, version: canonicalHash(records) };
 }
 
-async function createReviewedStudent(db, schoolId, actorId, request, number, body) {
+async function createReviewedStudent(db, schoolId, actorId, request, number, classIds, body) {
   if (request.kind !== 'student' || (request.number && request.number !== number))
     fail(400, 'VALIDATION', '建档须使用学生申请中的身份和学号');
   const { records, version } = await reviewMatches(db, schoolId, request);
@@ -84,7 +84,7 @@ async function createReviewedStudent(db, schoolId, actorId, request, number, bod
   );
   if (used.rowCount) fail(409, 'NUMBER_IN_USE', '此学号已有档案，请核对原档案');
   if (records.length && body.distinctStudent !== true) fail(409, 'REVIEW_SAME_NAME', '请先核对已有同名档案');
-  return insertSchoolIdentity(db, schoolId, actorId, { kind: 'student', number, name: request.name });
+  return insertSchoolIdentity(db, schoolId, actorId, { kind: 'student', number, name: request.name, classIds });
 }
 
 export async function handleSchoolJoinRequests({ pool, route, method, user, body }) {
@@ -155,6 +155,9 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
     const createNumber = body.createNumber === undefined ? null : field(body.createNumber, '校内学号', { max:64 });
     if (createNumber && (decision !== 'approved' || body.identityId != null))
       fail(400, 'VALIDATION', '请选择关联已有档案或新建学生档案');
+    if (!createNumber && body.classIds !== undefined)
+      fail(400, 'VALIDATION', '仅在审核中新建学生档案时可分配班级');
+    const classIds = body.classIds === undefined ? [] : readClassIds(body.classIds).sort();
     let identityId = decision === 'approved' && !createNumber ? uuid(body.identityId, '身份档案') : null;
     const {
       rows: [request],
@@ -164,7 +167,9 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
     ]);
     if (!request) fail(404, 'NOT_FOUND', '入校申请不存在');
     if (request.status !== 'pending') {
-      const sameTarget = createNumber ? request.created_student_number === createNumber && request.verification_method === body.verificationMethod
+      const sameTarget = createNumber
+        ? request.created_student_number === createNumber && request.verification_method === body.verificationMethod
+          && request.created_class_ids.length === classIds.length && classIds.every((classId, index) => classId === request.created_class_ids[index])
         : request.identity_id === identityId;
       if (request.status === decision && sameTarget)
         return result({ id, status: decision });
@@ -175,7 +180,7 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       ? enumValue(body.verificationMethod, ['in_person', 'school_contact'], '独立核验方式') : null;
     let identity;
     if (createNumber) {
-      identity = await createReviewedStudent(db, schoolId, user.id, request, createNumber, body);
+      identity = await createReviewedStudent(db, schoolId, user.id, request, createNumber, classIds, body);
       identityId = identity.id;
     } else if (identityId) {
       const match = await db.query(
@@ -191,9 +196,9 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       await auditSchool(db, schoolId, user.id, 'school.identity.link', identityId);
     }
     await db.query(
-      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5,created_student_number=$6
+      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5,created_student_number=$6,created_class_ids=$7
       WHERE id=$1`,
-      [id, decision, identityId, user.id, verification, createNumber],
+      [id, decision, identityId, user.id, verification, createNumber, classIds],
     );
     await auditSchool(db, schoolId, user.id, 'school.join_request.' + decision, id);
     return result({ id, status: decision });

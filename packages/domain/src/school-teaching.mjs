@@ -1,4 +1,4 @@
-import { identityFields, insertSchoolIdentity } from './school-identity-record.mjs';
+import { addToClassRosters, identityFields, insertSchoolIdentity, readClassIds, requireActiveClasses } from './school-identity-record.mjs';
 import { closePendingSchoolRequests } from './school-join-requests.mjs';
 import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
@@ -102,19 +102,6 @@ async function archiveIdentity(db,schoolId,actorId,id,archive) {
   return {status:200,body:{ok:true}};
 }
 
-function readClassIds(value) {
-  if (!Array.isArray(value)) fail(400, 'VALIDATION', '班级须为列表');
-  return [...new Set(value.map(id => uuid(id, '班级 ID').toLowerCase()))];
-}
-
-async function requireActiveClasses(db, schoolId, classes) {
-  if (!classes.length) return;
-  const { rows } = await db.query(`SELECT archived_at FROM school_classes
-    WHERE school_id = $1 AND id = ANY($2::uuid[])`, [schoolId, classes]);
-  if (rows.length !== classes.length) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
-  if (rows.some(row => row.archived_at)) fail(409, 'CLASS_ARCHIVED', '请选择使用中的班级');
-}
-
 async function createIdentity(db, schoolId, actorId, body) {
   const kind = enumValue(body.kind, IDENTITY_KINDS, '身份类型');
   const number = field(body.number, '编号', { max: 64 });
@@ -125,10 +112,8 @@ async function createIdentity(db, schoolId, actorId, body) {
   const { classIds = [] } = body;
   const classes = readClassIds(classIds);
   await requireMatchingMember(db, schoolId, accountId, kind);
-  await requireActiveClasses(db, schoolId, classes);
-  const identity = await insertSchoolIdentity(db, schoolId, actorId, { kind, number, name, accountId, gender, notes });
+  const identity = await insertSchoolIdentity(db, schoolId, actorId, { kind, number, name, accountId, gender, notes, classIds: classes });
   if (accountId) await closePendingSchoolRequests(db, schoolId, accountId, actorId);
-  if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
 }
 
@@ -353,17 +338,6 @@ async function requireRosterIdentity(db, schoolId, role, identityId) {
   const { rows: [identity] } = await db.query('SELECT kind FROM school_identities WHERE school_id = $1 AND id = $2 AND archived_at IS NULL', [schoolId, identityId]);
   if (!identity) fail(404, 'NOT_FOUND', '本校身份档案不存在');
   if (role === 'teacher' && identity.kind !== 'student') fail(403, 'FORBIDDEN', '教师只能管理学生名单');
-}
-
-async function addToClassRosters(db, schoolId, actorId, identityId, classIds) {
-  await db.query(`WITH added AS (
-    INSERT INTO school_class_roster (school_id, class_id, identity_id)
-    SELECT $1, class_id, $3 FROM unnest($4::uuid[]) AS classes(class_id)
-    ON CONFLICT (school_id, class_id, identity_id) DO NOTHING
-    RETURNING school_id, identity_id
-  )
-  INSERT INTO school_audit_events (school_id, actor_account_id, action, target_id)
-  SELECT school_id, $2, 'school.roster.add', identity_id FROM added`, [schoolId, actorId, identityId, classIds]);
 }
 
 async function addRosterIdentity(db, schoolId, actorId, role, classId, identityId) {

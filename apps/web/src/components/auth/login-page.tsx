@@ -6,6 +6,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, apiMessage, productionApi, type AuthResponse, type CampusUser } from "@/lib/production-api";
 import { useLocale } from "@/components/locale-context";
+import { sitePolicyHref } from "@/lib/site-policy-links";
 import { AuthShell } from "./auth-shell";
 import styles from "./auth-shell.module.css";
 
@@ -90,11 +91,13 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
   return <AuthShell>
     <header>
       <h2 ref={titleRef} tabIndex={-1} id="login-title" className={styles.title}>{mode === "login" ? t("登录") : t("重置密码")}</h2>
-      <p className={styles.description}>{mode === "login" ? joinIntent ? tx("登录后，在「设置 → 学校」中选择「加入学校」。", "After signing in, open Settings → Schools and select “Join a school”.") : tx("登录后继续课程学习与编程练习。", "Continue your courses and coding practice.") : t("请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
+      <p className={styles.description}>{mode === "login" ? joinIntent ? tx("登录后，在「设置 → 学校」中选择「加入学校」。", "After signing in, open Settings → Schools and select “Join a school”.") : tx("登录后继续课程学习与编程练习。", "Continue your courses and coding practice.") : tx("未入校的个人用户请联系平台管理员；账号由学校独立管理的师生请联系本校管理员。", "For a personal account with no school membership, contact a platform administrator. For a student or teacher account managed exclusively by one school, contact that school’s administrator.")}</p>
     </header>
     {mode === "reset" && <details className={styles.help}>
       <summary>{tx("如何获取重置凭据？", "How do I get a reset code?")}</summary>
-      <p>{t("本校使用本地账号，没有公网邮件找回服务。请向课程教师或管理员提供用户名、姓名及学号 / 工号，由管理员核实身份后提供一次性重置凭据。不要提供原密码。")}</p>
+      <p>{tx("未入校的旧个人账号，即使没有绑定邮箱、无法登录，也可申请人工核验。请提供用户名，由平台管理员与你核对账号归属。", "If you have an older personal account with no school membership, you can request a manual review even without an email address or access to the account. Give the platform administrator your username to start the review.")} <Link className="text-primary underline" href={sitePolicyHref(locale, "contact")}>{tx("联系平台管理员", "Contact platform support")}</Link></p>
+      <p>{tx("学校独立管理的账号由本校管理员核对档案姓名和学号或工号。管理员核实后会私下提供一次性重置码，有效期 30 分钟。平台不会自动发送找回邮件。", "For school-managed accounts, your school administrator checks your name and student or staff ID. After verification, the administrator gives you a one-time code valid for 30 minutes. There is no automated recovery email.")}</p>
+      <p>{tx("已入校的个人账号、跨校账号或管理员账号如需帮助，请联系平台咨询。", "For help with a personal account linked to a school, a multi-school account or an administrator account, contact platform support.")}</p>
       <p>{t("已有账号无需重新注册或再次激活；重置密码不会删除班级、作业或提交记录。")}</p>
     </details>}
     <form key={mode} ref={formRef} onSubmit={submit} className={styles.form} aria-busy={busy} noValidate>

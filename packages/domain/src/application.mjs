@@ -24,7 +24,8 @@ import { handleCommunity } from './community.mjs';
 import { handlePlatformGovernance } from './platform-governance.mjs';
 import { requireWorkspaceRoute, schoolBookmark } from './workspace-access.mjs';
 import { handleSchoolAccounts } from './school-accounts.mjs';
-import { auditSchool, handleSchools, redeemSchoolPasswordReset } from './schools.mjs';
+import { auditSchool, handleSchools } from './schools.mjs';
+import { redeemPasswordReset } from './redeem-password-reset.mjs';
 import { handleSchoolTeaching } from './school-teaching.mjs';
 import { handleSchoolCourses } from './school-courses.mjs';
 import { handleSchoolIdentityImports } from './school-identity-imports.mjs';
@@ -170,7 +171,7 @@ export async function createDomainServices(pool,config) {
     const code=field(body.resetCode,'重置凭据',{max:100}).replace(/[\s\u200b-\u200f\u2060]/gu,'');
     authLimiter.check(`reset:${login}`);const hash=await hashPassword(body.password);
     await transaction(pool,async db=>{
-     const accountId=await redeemSchoolPasswordReset(db,login,code,hash);
+     const accountId=await redeemPasswordReset(db,login,code,hash);
      await audit(db,accountId,'auth.password_reset','account',accountId);
     });return respond(200,{ok:true},sessionCookie('',{...config,maxAge:0}));
    }

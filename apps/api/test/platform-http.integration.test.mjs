@@ -236,10 +236,90 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.deepEqual((await request(`/schools/${school.id}/problem-banks`, { auth: teacher })).data.items, []);
       });
 
+      const review = { verificationNote: 'Account ownership verified in a manual review.' };
+      const issuePath = account => '/platform/accounts/'+account.data.user.id+'/reset';
+      const newPassword = randomBytes(24).toString('base64url');
+      const redeem = (account, code) => post('/auth/reset', undefined, {
+        username: account.data.user.username, resetCode: code, password: newPassword,
+      });
+      const personal = await request('/auth/register-personal', {method:'POST',body:{username:'personal-recovery',password}});
+      assert.equal(personal.status,201);
+      await t.test('manual review permits only a platform admin to issue a code for an eligible personal login', async () => {
+        const path = issuePath(personal);
+        assert.equal((await post(path,undefined,review)).status,401);
+        for (const actor of [personal,firstAdmin,legacy]) assert.equal((await post(path,actor,review)).status,403);
+        assert.equal((await request(path,{method:'POST',auth:platform,body:review,csrf:false})).status,403);
+        for (const note of [undefined,'   ','x'.repeat(301)]) {
+          assert.equal((await post(path,platform,{verificationNote:note})).status,400);
+        }
+        for (const account of [platform,firstAdmin,teacher,learner,legacy]) {
+          assert.equal((await post(issuePath(account),platform,review)).status,403);
+        }
+        const accounts = (await request('/platform/accounts',{auth:platform})).data.items;
+        assert.equal(accounts.find(row=>row.accountId===personal.data.user.id).canResetPassword,true);
+        assert.equal(accounts.find(row=>row.accountId===teacher.data.user.id).canResetPassword,false);
+        const loginPath = '/platform/accounts/'+personal.data.user.id+'/login';
+        const setDisabled = disabled => request(loginPath,{method:'PATCH',auth:platform,body:{disabled}});
+        assert.equal((await setDisabled(true)).status,200);
+        assert.equal((await post(path,platform,review)).status,403);
+        assert.equal((await setDisabled(false)).status,200);
+      });
+      await t.test('a personal code expires, supersedes older codes, and changes the password and sessions exactly once', async () => {
+        const path = issuePath(personal);
+        const issue = async () => {
+          const response = await post(path,platform,review);
+          assert.equal(response.status,200);
+          assert.equal(response.data.username,personal.data.user.username);
+          assert.match(response.data.resetCode,/^[A-Za-z0-9_-]{32}$/);
+          return response.data.resetCode;
+        };
+        const first = await issue();
+        const accountId = personal.data.user.id;
+        const {rows:[token]} = await pool.query(`SELECT token_hash,expires_at BETWEEN now()+interval '29 minutes'
+          AND now()+interval '31 minutes' AS valid FROM reset_tokens WHERE account_id=$1`,[accountId]);
+        assert.match(token.token_hash,/^[0-9a-f]{64}$/);
+        assert.equal(token.valid,true);
+        const {rows:[event]} = await pool.query(`SELECT actor_account_id,detail FROM platform_audit_events
+          WHERE target_account_id=$1 AND action='platform.password_reset.issue'`,[accountId]);
+        assert.equal(event.actor_account_id,platform.data.user.id);
+        assert.deepEqual(event.detail,review);
+        await pool.query("UPDATE reset_tokens SET expires_at=now()-interval '1 minute' WHERE account_id=$1",[accountId]);
+        assert.equal((await redeem(personal,first)).status,400);
+        const second = await issue();
+        const latest = await issue();
+        assert.equal((await redeem(personal,second)).status,400);
+        assert.equal((await redeem(firstAdmin,latest)).status,400);
+        const login = password => post('/auth/login',undefined,{username:personal.data.user.username,password});
+        const oldSession = await login(password);
+        assert.equal(oldSession.status,200);
+        const outcomes = await Promise.all([redeem(personal,latest),redeem(personal,latest)]);
+        assert.deepEqual(outcomes.map(r=>r.status).sort(),[200,400]);
+        assert.equal((await request('/auth/me',{auth:oldSession})).status,401);
+        assert.equal((await login(password)).status,401);
+        assert.equal((await login(newPassword)).status,200);
+      });
+      await t.test('personal reset eligibility is rechecked after school enrollment or promotion', async () => {
+        const target = await registerPersonal(request,'changes-school',password);
+        const issued = await post(issuePath(target),platform,review);
+        assert.equal(issued.status,200);
+        await enrollWithClaim(post,originalSchool,legacy,target,{kind:'student',name:'New member',number:'PR1'});
+        assert.equal((await redeem(target,issued.data.resetCode)).status,400);
+        await pool.query('UPDATE school_memberships SET revoked_at=now(),suspended=true WHERE account_id=$1',[target.data.user.id]);
+        assert.equal((await post(issuePath(target),platform,review)).status,403);
+        const promoted = await registerPersonal(request,'new-platform-admin',password);
+        const beforeGrant = await post(issuePath(promoted),platform,review);
+        assert.equal(beforeGrant.status,200);
+        await provisionPlatformAdministrator(pool,{username:promoted.data.user.username});
+        assert.equal((await redeem(promoted,beforeGrant.data.resetCode)).status,400);
+      });
+      const pendingReset = await post(issuePath(personal),platform,review);
+      assert.equal(pendingReset.status,200);
       // Existing sessions must lose governance access as soon as the grant is revoked.
       await pool.query('UPDATE platform_admins SET revoked_at=clock_timestamp() WHERE account_id=$1', [platform.data.user.id]);
       assert.equal((await request('/platform/schools', { auth: platform })).status, 403);
+      assert.equal((await redeem(personal,pendingReset.data.resetCode)).status,400);
       await provisionPlatformAdministrator(pool, { username: 'platform-operator' });
+      assert.equal((await redeem(personal,pendingReset.data.resetCode)).status,400, 'regrant must not revive an earlier reset code');
       assert.equal((await request('/platform/schools', { auth: platform })).status, 200);
       await pool.query('UPDATE accounts SET disabled_at=clock_timestamp() WHERE id=$1', [platform.data.user.id]);
       assert.equal((await request('/platform/schools', { auth: platform })).status, 401);

@@ -4,9 +4,10 @@ import { useState } from "react";
 import { inputClass, Loading, useData } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { AccountAccessAction } from "./account-access-action";
+import { PlatformPasswordReset } from "./platform-password-reset";
 import { useSchoolText } from "./school-ui";
 
-type LoginAccount = {accountId: string; name: string; username: string; disabled: boolean; platformAdmin: boolean};
+type LoginAccount = {accountId: string; name: string; username: string; disabled: boolean; platformAdmin: boolean; canResetPassword: boolean};
 
 export function PlatformAccounts() {
   const text = useSchoolText();
@@ -40,7 +41,10 @@ export function PlatformAccounts() {
             <td className="px-4 py-2"><span className="font-medium">{account.name}</span><span className="block text-xs text-muted-foreground">{account.username}</span></td>
             <td className="whitespace-nowrap px-4 py-2">{account.disabled ? text("Disabled","已禁用") : text("Enabled","已启用")}</td>
             <td className="px-4 py-2 text-right">{account.platformAdmin ? <span className="text-xs text-muted-foreground">{text("Protected platform administrator", "平台管理员（受保护）")}</span>
-              : <AccountAccessAction account={account} access={{scope:"platform",disabled:account.disabled}} onSaved={accounts.reload}/>}</td>
+              : <div className="flex flex-wrap justify-end gap-2">
+                {account.canResetPassword && <PlatformPasswordReset account={account}/>}
+                <AccountAccessAction account={account} access={{scope:"platform",disabled:account.disabled}} onSaved={accounts.reload}/>
+              </div>}</td>
           </tr>)}</tbody>
         </table>
         {!accounts.data?.items.length && <p className="p-4 text-sm text-muted-foreground">{text("No matching accounts.", "没有匹配的账号。")}</p>}

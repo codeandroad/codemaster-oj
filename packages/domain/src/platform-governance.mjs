@@ -1,4 +1,5 @@
 import { transaction } from './db.mjs';
+import { issuePasswordResetCode } from './password-reset-tokens.mjs';
 import { enumValue, fail, field, integer, username, uuid } from './security.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching } from './schools.mjs';
 
@@ -15,13 +16,14 @@ export async function isPlatformAdministrator(db, accountId) {
   return rowCount > 0;
 }
 
-async function requirePlatformAdministrator(db, accountId) {
+export async function requirePlatformAdministrator(db, accountId, issuedAt = null) {
   await activeAccount(db, accountId);
   // Runtime has SELECT-only access to platform grants. Capability maintenance
   // locks the credential first, so the account lock above serializes with it
   // without granting the API UPDATE rights on its own authorization table.
   const { rowCount } = await db.query(`
-    SELECT account_id FROM platform_admins WHERE account_id = $1 AND revoked_at IS NULL`, [accountId]);
+    SELECT account_id FROM platform_admins WHERE account_id = $1 AND revoked_at IS NULL
+      AND ($2::timestamptz IS NULL OR granted_at <= $2)`, [accountId,issuedAt]);
   if (!rowCount) fail(403, 'PLATFORM_ADMIN_REQUIRED', '需要平台管理员权限');
 }
 
@@ -123,13 +125,32 @@ async function searchSchoolAdminCandidates(db, url) {
 const loginAccount = `FROM accounts a JOIN identities i ON i.id=a.identity_id
   WHERE a.binding_released_at IS NULL AND i.archived_at IS NULL`;
 const platformGrant = 'EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)';
+const canResetPersonal = `i.kind='personal' AND a.disabled_at IS NULL AND NOT ${platformGrant}
+  AND NOT EXISTS (SELECT 1 FROM school_memberships m WHERE m.account_id=a.id AND (m.revoked_at IS NULL OR m.suspended))
+  AND NOT EXISTS (SELECT 1 FROM school_administrators g WHERE g.account_id=a.id AND g.revoked_at IS NULL)`;
+
+export async function lockPersonalResetTarget(db, accountId) {
+  const query = `SELECT a.username ${loginAccount} AND a.id=$1 AND ${canResetPersonal}`;
+  if (!(await db.query(query+' FOR UPDATE OF a',[accountId])).rowCount) return null;
+  // An enrollment or grant could have committed while we waited for the account.
+  return (await db.query(query,[accountId])).rows[0];
+}
+
+async function issuePersonalReset(db, actorId, accountId, body) {
+  const note = field(body.verificationNote, '人工核验记录', {max:300});
+  const account = await lockPersonalResetTarget(db, accountId);
+  if (!account) fail(403,'PERSONAL_RESET_UNAVAILABLE','只可为未入校且登录正常的普通个人账号签发重置码');
+  const resetCode = await issuePasswordResetCode(db, accountId, actorId, {scope:'platform-personal'});
+  await auditPlatform(db,actorId,'platform.password_reset.issue',{accountId,detail:{verificationNote:note}});
+  return result({username:account.username,resetCode});
+}
 
 async function listLoginAccounts(db, url) {
   const page = integer(Number(url.searchParams.get('page') ?? 1),1,100000,'页码');
   const term = field(url.searchParams.get('q') ?? '', '关键词', {min:0,max:100}).toLowerCase();
   const status = enumValue(url.searchParams.get('status') ?? 'all', ['all','enabled','disabled'], '平台登录状态');
   const {rows} = await db.query(`SELECT a.id AS "accountId",a.username,i.name,a.disabled_at IS NOT NULL AS disabled,
-    ${platformGrant} AS "platformAdmin" ${loginAccount}
+    ${platformGrant} AS "platformAdmin", (${canResetPersonal}) AS "canResetPassword" ${loginAccount}
     AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0)
     AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
     ORDER BY a.username,a.id LIMIT 51 OFFSET $3`, [term,status,(page-1)*50]);
@@ -233,12 +254,14 @@ export async function handlePlatformGovernance({ pool,user,route,method,body,url
   const searching = route === '/platform/school-admin-candidates' && method === 'GET';
   const accounts = route === '/platform/accounts' && method === 'GET';
   const login = method === 'PATCH' && route.match(/^\/platform\/accounts\/([^/]+)\/login$/);
+  const reset = method === 'POST' && route.match(/^\/platform\/accounts\/([^/]+)\/reset$/);
   const match = route.match(/^\/platform\/schools(?:\/([^/]+)(?:\/(administrators))?)?$/);
-  if (!searching && !match && !accounts && !login) return null;
+  if (!searching && !match && !accounts && !login && !reset) return null;
   const schoolId = match?.[1] ? uuid(match[1], '学校 ID') : null;
   return transaction(pool, async db => {
     await requirePlatformAdministrator(db, user.id);
     if (accounts) return listLoginAccounts(db,url);
+    if (reset) return issuePersonalReset(db,user.id,uuid(reset[1],'账号 ID'),body);
     if (login) return setPlatformLogin(db,user.id,uuid(login[1],'账号 ID'),body.disabled);
     if (searching) return searchSchoolAdminCandidates(db,url);
     if (!schoolId && method === 'GET') return listSchools(db,url);

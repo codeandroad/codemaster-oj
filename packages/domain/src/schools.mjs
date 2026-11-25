@@ -1,6 +1,7 @@
 import { transaction } from './db.mjs';
+import { issuePasswordResetCode } from './password-reset-tokens.mjs';
 import { archiveRemovedStudent, handleSchoolExits } from './school-exits.mjs';
-import { enumValue, fail, field, integer, randomToken, tokenHash, username, uuid } from './security.mjs';
+import { enumValue, fail, field, integer, username, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
 
@@ -15,39 +16,6 @@ export const schoolCredentialCustodySql = `m.revoked_at IS NULL AND m.role IN ('
   AND NOT EXISTS (SELECT 1 FROM school_memberships other
     WHERE other.account_id=a.id AND other.school_id<>m.school_id AND other.suspended)
   AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
-
-export async function redeemSchoolPasswordReset(db, login, code, passwordHash) {
-  const digest = tokenHash(code);
-  const invalid = () => fail(400, 'RESET_FAILED', '重置凭据无效或已过期');
-  const { rows: [scope] } = await db.query(`
-    SELECT a.id, issue.actor_account_id AS issuer, issue.metadata->>'schoolId' AS school
-    FROM accounts a JOIN reset_tokens t ON t.account_id=a.id
-    JOIN LATERAL (SELECT actor_account_id,metadata FROM audit_events
-      WHERE action='account.reset_issue' AND resource_type='account' AND resource_id=a.id::text
-      ORDER BY id DESC LIMIT 1) issue ON true
-    WHERE a.username=$1 AND t.token_hash=$2 AND t.consumed_at IS NULL AND t.expires_at>clock_timestamp()`, [login, digest]);
-  if (!scope?.school) invalid();
-  await lockSchoolTeaching(db, scope.school);
-  try {
-    await requireSchoolAdmin(db, scope.school, scope.issuer);
-  } catch (error) {
-    if ([401,403,404].includes(error.status)) invalid();
-    throw error;
-  }
-  const target = await db.query(`SELECT a.id FROM accounts a JOIN identities i ON i.id=a.identity_id
-    WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
-    FOR UPDATE OF a`, [scope.id]);
-  if (!target.rowCount) invalid();
-  const consumed = await db.query(`UPDATE reset_tokens SET consumed_at=clock_timestamp()
-    FROM accounts a JOIN school_memberships m ON m.account_id=a.id
-    WHERE reset_tokens.account_id=a.id AND a.id=$1 AND m.school_id=$2 AND ${schoolCredentialCustodySql}
-      AND reset_tokens.token_hash=$3 AND reset_tokens.consumed_at IS NULL AND reset_tokens.expires_at>clock_timestamp()
-    RETURNING a.id`, [scope.id, scope.school, digest]);
-  if (!consumed.rowCount) invalid();
-  await db.query('UPDATE accounts SET password_hash=$2 WHERE id=$1', [scope.id, passwordHash]);
-  await db.query('DELETE FROM sessions WHERE account_id=$1', [scope.id]);
-  return scope.id;
-}
 
 export async function activeAccount(db, accountId) {
   const { rowCount } = await db.query(`
@@ -221,13 +189,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       const eligible = await db.query(`SELECT 1 FROM school_memberships m JOIN accounts a ON a.id=m.account_id
         WHERE m.school_id=$1 AND m.account_id=$2 AND ${schoolCredentialCustodySql}`, [schoolId, target]);
       if (!eligible.rowCount) fail(403, 'FORBIDDEN', '只能重置本校独立管理的普通成员账号');
-      const resetCode = randomToken();
-      await db.query(
-        "INSERT INTO reset_tokens(account_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes') ON CONFLICT(account_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at,consumed_at=NULL",
-        [target, tokenHash(resetCode)]);
-      await db.query(
-        'INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',
-        [user.id, 'account.reset_issue', 'account', target, {schoolId}]);
+      const resetCode = await issuePasswordResetCode(db, target, user.id, {schoolId});
       await auditSchool(db, schoolId, user.id, 'school.account_reset', target);
       return result({ username: member.username, resetCode });
     });

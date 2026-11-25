@@ -14,7 +14,7 @@ export class PlatformController {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }
 
-  @Post(['schools', 'schools/:schoolId/administrators'])
+  @Post(['schools', 'schools/:schoolId/administrators', 'accounts/:accountId/reset'])
   async create(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }

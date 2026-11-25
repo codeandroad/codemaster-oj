@@ -127,9 +127,10 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           ],
         },
         {
-          heading: "School accounts and records",
+          heading: "Account recovery and school records",
           paragraphs: [
-            "Contact your school administrator for school applications, identity claim codes, class membership, record corrections or a one-time password reset code. Use your school’s existing private support channel and share only the information needed to identify your account.",
+            "For a personal account with no school membership, use the platform contact details above to request a manual ownership review. You can request a review for an older account even without an email address or a recovery credential. After verification, the platform administrator can issue a one-time password reset code.",
+            "For a student or teacher account managed exclusively by your school, contact your school administrator privately for a reset code. Your school also handles applications, identity claim codes, class membership and corrections to school records.",
           ],
         },
         {
@@ -261,9 +262,10 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           ],
         },
         {
-          heading: "校内账号和身份档案",
+          heading: "找回账号与校内身份档案",
           paragraphs: [
-            "入校申请、身份认领码、班级归属、档案更正或一次性密码重置凭据，请通过学校已有的私下沟通渠道联系学校管理员。仅提供用于确认本人账号所需的信息。",
+            "未入校的个人用户可通过上方联系方式申请人工核验账号归属。没有预留邮箱或找回凭据的旧账号也可申请。平台管理员核实后可私下签发一次性密码重置码。",
+            "账号由学校独立管理的师生，请私下联系本校管理员领取重置码。入校申请、身份认领码、班级归属和校内档案更正也由学校管理员办理。",
           ],
         },
         {

@@ -10,6 +10,12 @@ export function SiteFooter({ locale, current, className = "" }: {
   return (
     <footer className={`flex flex-col gap-y-1 border-t border-border py-3 text-sm text-muted-foreground xl:flex-row xl:items-center xl:justify-between xl:gap-x-6 ${className}`}>
       <p className="shrink-0">© 2006 CodeMaster</p>
+      <a
+        href="https://beian.miit.gov.cn/"
+        className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-sm underline-offset-4 hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        沪ICP备2026063381号-1
+      </a>
       <nav aria-label={locale === "zh" ? "网站政策与联系" : "Site policies and contact"}>
         <ul className="flex flex-wrap gap-x-3 xl:justify-end xl:gap-x-5">
           {sitePolicySlugs.map(document => (

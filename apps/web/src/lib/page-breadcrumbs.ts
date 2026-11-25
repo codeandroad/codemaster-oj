@@ -13,7 +13,6 @@ const sections: Record<string, Label> = {
   "/practice/review-notebook": ["订正本", "Review notebook"],
   "/practice/leaderboard": ["公开练习榜", "Leaderboard"],
   "/practice/scholarship": ["我的奖学金", "Scholarship"],
-  "/practice/poker": ["德州扑克", "Texas Hold'em"],
   "/practice/settings": ["个人设置", "Personal settings"],
   "/practice/profile": ["个人资料", "Profile"],
   "/activate": ["加入学校", "Join a school"],

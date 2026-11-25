@@ -3,7 +3,7 @@ const availablePages = new Set([
   "/student/acsl",
   "/teacher/acsl", "/admin/acsl",
   "/student/scholarship", "/teacher/scholarship", "/admin/scholarship",
-  "/practice/scholarship", "/practice/poker",
+  "/practice/scholarship",
   "/student/settings", "/teacher/settings", "/admin/personal-settings",
   "/student/points", "/teacher/points", "/admin/points", "/admin/profile",
   "/", "/login", "/register", "/admin", "/teacher", "/schools", "/platform", "/activate", "/practice", "/practice/courses", "/practice/problems", "/practice/settings", "/practice/profile", "/practice/submissions", "/practice/review-notebook", "/practice/leaderboard",

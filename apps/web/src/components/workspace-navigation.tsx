@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, Gauge, GraduationCap, Home, LayoutDashboard, Library, Lock, NotebookPen, Settings, Spade, UserRound, Users } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, Gauge, GraduationCap, Home, LayoutDashboard, Library, NotebookPen, Settings, UserRound, Users } from "lucide-react";
 import { AppLink } from "./navigation";
 import { useLocale } from "./locale-context";
 import { ScholarshipIcon } from "./scholarship/scholarship-icon";
@@ -61,12 +61,9 @@ const publicStudyPaths: Record<string, string> = {
   scholarship: "/practice/scholarship",
 };
 
-export const publicStudyNavigation: readonly WorkspaceNavigationItem[] = [
-  ...workspaceNavigation.student
-    .filter(item => Object.hasOwn(publicStudyPaths, item.section))
-    .map(item => ({ ...item, path: publicStudyPaths[item.section] })),
-  { section: "poker", path: "/practice/poker", label: "德州扑克", shortEnglish: "Texas Hold'em", icon: Spade },
-];
+export const publicStudyNavigation = workspaceNavigation.student
+  .filter(item => Object.hasOwn(publicStudyPaths, item.section))
+  .map(item => ({ ...item, path: publicStudyPaths[item.section] }));
 
 export function learnerNavigation(schoolId?: string) {
   return schoolId ? workspaceNavigation.student.filter(item => item.section !== "timed").map(item =>
@@ -81,7 +78,7 @@ export function useWorkspaceNavigationLabel() {
 }
 
 export function WorkspaceNavigation({ items, disabled = false }: {
-  items: ReadonlyArray<Pick<WorkspaceNavigationItem, "label" | "shortEnglish" | "icon"> & { href: string; active: boolean; locked?: boolean }>;
+  items: ReadonlyArray<Pick<WorkspaceNavigationItem, "label" | "shortEnglish" | "icon"> & { href: string; active: boolean }>;
   disabled?: boolean;
 }) {
   const { t } = useLocale();
@@ -93,7 +90,6 @@ export function WorkspaceNavigation({ items, disabled = false }: {
         const content = <>
           <item.icon size={17} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{label(item)}</span>
-          {item.locked && <Lock size={13} className="shrink-0 opacity-65" aria-hidden="true" />}
         </>;
         return disabled ? (
           <span key={item.href} aria-current={item.active ? "page" : undefined} aria-disabled="true" className={`${className} opacity-60`}>{content}</span>

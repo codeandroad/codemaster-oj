@@ -82,8 +82,6 @@ function Ledger({
     refund: tx("消费退款", "Purchase refund"),
     first_ac: tx("首次 AC 奖励", "First-AC reward"),
     activity: tx("活动额外奖励", "Activity reward"),
-    poker_buyin: tx("德州扑克买入", "Poker buy-in"),
-    poker_cashout: tx("德州扑克兑回", "Poker cash-out"),
   };
   return (<>
     <Table

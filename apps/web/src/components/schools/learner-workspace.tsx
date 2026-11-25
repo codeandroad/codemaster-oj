@@ -40,7 +40,6 @@ import { SchoolLeaderboard } from "./school-scholarship";
 import { LearnerResourceScope } from "./learner-resource-scope";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { LearnerRecords } from "./public-study-records";
-import { OpenPlatformPoker } from "@/components/poker/open-platform-poker";
 
 type LearnerProps = {
   user: CampusUser; pathname: string; school?: School; onLogout: () => void;
@@ -54,7 +53,6 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const { settings, update, resolvedPageTheme } = useWorkspaceSettings(user.id);
   const logout = useMutation();
   const memberships = useWorkspaceData<{items:School[]}>("schools");
-  const pokerStatus = useData<{enabled:boolean;unlocked:boolean}>(school ? "" : "practice/poker/status");
   const acslEnabled = useAcslEnabled(school?.id,false);
   const [, , publicSection, resourceId] = pathname.split("/");
   const requested = school ? (search.get("join") === "1" ? "settings" : search.get("section")) : publicSection;
@@ -113,9 +111,6 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
       content = <StudentScholarshipPage key={wallet} endpoint={wallet} scopeName={scopeName}
         exchangeSchools={(school ? [school] : schools).map(s => ({id:s.id, name:schoolDisplayName(s,locale)}))}/>;
       break;
-    case "poker":
-      content = !school && <OpenPlatformPoker/>;
-      break;
     case "classes":
       content = school && (classId ? <StudentClass id={classId} schoolId={school.id}/> : <StudentClasses schoolId={school.id}/>);
       break;
@@ -149,7 +144,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
               {schools.map(s=><option key={s.id} value={s.id}>{schoolDisplayName(s,locale)}</option>)}</select> : undefined}
             breadcrumb={<LearnerBreadcrumb home={href("home")} homeLabel={text("Home","首页")} section={section} label={label}
               parent={section==="classes" && classId ? {href:href("classes"),label} : prep ? {href:href("exam-preparation"),label:text("Exam preparation","备考中心")} : undefined}/>}
-            navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section),locked:item.section==="poker" && !(pokerStatus.data?.enabled && pokerStatus.data?.unlocked)}))}/>}
+            navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section)}))}/>}
             account={<><ScholarshipBalance identityId={user.id} endpoint={wallet} href={href("scholarship")}/>
               <NotificationDropdown key={school?.id ?? "public"} workspace={school ? "student" : "public"} schoolId={school?.id} scholarshipHref={href("scholarship")}/>
               <AccountMenu user={user} profileHref={href("profile")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}

@@ -44,7 +44,6 @@ export function ScholarshipPopover({ balance, href, entries, ledgerPath, error, 
     initial_grant: text("初始发放", "Initial allowance"), admin_grant: text("管理员发放", "Administrator grant"),
     admin_adjustment: text("余额调整", "Balance adjustment"), purchase: text("解锁学习辅助", "Assistance unlock"),
     refund: text("退款", "Refund"), first_ac: text("首次 AC 奖励", "First-AC reward"), activity: text("活动奖励", "Activity reward"),
-    poker_buyin: text("德州扑克买入", "Poker buy-in"), poker_cashout: text("德州扑克兑回", "Poker cash-out"),
   };
 
   useEffect(() => {

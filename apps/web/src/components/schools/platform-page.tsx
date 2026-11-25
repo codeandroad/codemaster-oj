@@ -12,7 +12,6 @@ import {
   BookOpen,
   BookOpenCheck,
   RefreshCw,
-  Spade,
   Users,
 } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
@@ -39,7 +38,6 @@ import { PlatformCourses } from "./platform-courses";
 import { PlatformAccounts } from "./platform-accounts";
 import { PublicCourseReview } from "./public-course-review";
 import { PublicProblemReview } from "./school-practice";
-import { PlatformPokerAdmin } from "./platform-poker-admin";
 import {
   usePlatformError,
   type PlatformSchool,
@@ -52,7 +50,6 @@ const platformSections = {
   courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
   problems: { icon: BookOpenCheck, en: "Platform problem bank", zh: "平台题库" },
   "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
-  poker: { icon: Spade, en: "Texas Hold'em", zh: "德州扑克" },
 } as const;
 type PlatformSection = keyof typeof platformSections;
 
@@ -237,8 +234,6 @@ function PlatformAdminPage({
                       <PlatformCourses />
                     ) : section === "course-review" ? (
                       <PublicCourseReview />
-                    ) : section === "poker" ? (
-                      <PlatformPokerAdmin />
                     ) : (
                       <><CatalogGroups base="platform"/><PublicProblemReview user={user} /></>
                     )}

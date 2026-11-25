@@ -70,10 +70,11 @@ test('explicit platform governance preserves teaching roles and enforces authori
         [`/platform/accounts/${protectedId}/login`, 'PATCH', {disabled:true}],
         [`${prefix}/accounts/${protectedId}/roles`, 'PATCH', {role:'teacher',expectedRole:'student',administrator:false,expectedAdministrator:false}],
         [`${prefix}/accounts/${protectedId}/access`, 'PATCH', {suspended:true}],
-        [`${prefix}/members/${protectedId}/reset`, 'POST', {}],
       ]) {
         assert.equal((await request(path,{method,body,auth:legacy})).status,403,path);
       }
+
+      assert.equal((await post(prefix+'/members/'+protectedId+'/reset',legacy,{})).status,404);
 
       const createBody = { slug: 'platform-school', name: 'Platform School', adminUsername: 'school-founder' };
       assert.equal((await request('/platform/schools', { method: 'POST', auth: platform, csrf: false, body: createBody })).status, 403);
@@ -252,12 +253,15 @@ test('explicit platform governance preserves teaching roles and enforces authori
         for (const note of [undefined,'   ','x'.repeat(301)]) {
           assert.equal((await post(path,platform,{verificationNote:note})).status,400);
         }
-        for (const account of [platform,firstAdmin,teacher,learner,legacy]) {
+        for (const account of [platform,firstAdmin,legacy]) {
           assert.equal((await post(issuePath(account),platform,review)).status,403);
         }
         const accounts = (await request('/platform/accounts',{auth:platform})).data.items;
         assert.equal(accounts.find(row=>row.accountId===personal.data.user.id).canResetPassword,true);
-        assert.equal(accounts.find(row=>row.accountId===teacher.data.user.id).canResetPassword,false);
+        for (const account of [teacher,learner]) {
+          assert.equal(accounts.find(row=>row.accountId===account.data.user.id).canResetPassword,true);
+          assert.equal((await post(issuePath(account),platform,review)).status,200);
+        }
         const loginPath = '/platform/accounts/'+personal.data.user.id+'/login';
         const setDisabled = disabled => request(loginPath,{method:'PATCH',auth:platform,body:{disabled}});
         assert.equal((await setDisabled(true)).status,200);
@@ -298,18 +302,61 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.equal((await login(password)).status,401);
         assert.equal((await login(newPassword)).status,200);
       });
-      await t.test('personal reset eligibility is rechecked after school enrollment or promotion', async () => {
-        const target = await registerPersonal(request,'changes-school',password);
-        const issued = await post(issuePath(target),platform,review);
-        assert.equal(issued.status,200);
-        await enrollWithClaim(post,originalSchool,legacy,target,{kind:'student',name:'New member',number:'PR1'});
-        assert.equal((await redeem(target,issued.data.resetCode)).status,400);
-        await pool.query('UPDATE school_memberships SET revoked_at=now(),suspended=true WHERE account_id=$1',[target.data.user.id]);
-        assert.equal((await post(issuePath(target),platform,review)).status,403);
+      await t.test('a claimed student and approved teacher can recover the same login after each enrollment', async () => {
+        const username = 'changes-school';
+        const target = await registerPersonal(request,username,password);
+        const id = target.data.user.id;
+        async function recover(auth, previousPassword) {
+          const issued = await post(issuePath(target),platform,review);
+          assert.equal(issued.status,200);
+          const nextPassword = randomBytes(24).toString('base64url');
+          const reset = await post('/auth/reset',undefined,{username,resetCode:issued.data.resetCode,password:nextPassword});
+          assert.equal(reset.status,200);
+          assert.equal((await request('/auth/me',{auth})).status,401);
+          assert.equal((await post('/auth/login',undefined,{username,password:previousPassword})).status,401);
+          const session = await post('/auth/login',undefined,{username,password:nextPassword});
+          assert.equal(session.status,200);
+          assert.equal(session.data.user.id,id);
+          return {session,password:nextPassword};
+        }
+        const student = await enrollWithClaim(post,originalSchool,legacy,target,{kind:'student',name:'New member',number:'PR1'});
+        const first = await recover(target,password);
+        const schools = async auth => (await request('/schools',{auth})).data.items.map(s=>s.id);
+        assert.deepEqual(await schools(first.session),[originalSchool.id]);
+        const facts = {kind:'teacher',name:'New teacher',number:'PR2'};
+        const directory = '/schools/'+school.id;
+        const teacher = await post(directory+'/identities',firstAdmin,facts);
+        assert.equal(teacher.status,201);
+        const application = await post(directory+'/join-requests',first.session,facts);
+        assert.equal(application.status,201);
+        const decision = await post(directory+'/join-requests/'+application.data.id+'/decision',firstAdmin,{
+          decision:'approved',identityId:teacher.data.id,
+        });
+        assert.equal(decision.status,200);
+        const second = await recover(first.session,first.password);
+        assert.deepEqual((await schools(second.session)).sort(),[originalSchool.id,school.id].sort());
+        for (const [schoolId,admin,identityId,role] of [
+          [originalSchool.id,legacy,student.id,'student'],[school.id,firstAdmin,teacher.data.id,'teacher'],
+        ]) {
+          const account = await request('/schools/'+schoolId+'/accounts/'+id,{auth:admin});
+          assert.equal(account.status,200);
+          assert.equal(account.data.identityId,identityId);
+          assert.equal(account.data.role,role);
+          assert.equal(account.data.canResetPassword,false);
+          assert.equal((await post(issuePath(target),admin,review)).status,403);
+        }
+        const suspended = await request(directory+'/accounts/'+id+'/access',{method:'PATCH',auth:firstAdmin,body:{suspended:true}});
+        assert.equal(suspended.status,200);
+        const third = await recover(second.session,second.password);
+        assert.equal((await request(directory+'/courses',{auth:third.session})).status,404);
+        assert.deepEqual(await schools(third.session),[originalSchool.id]);
+      });
+      await t.test('administrator promotion prevents issuing and redeeming ordinary reset codes', async () => {
         const promoted = await registerPersonal(request,'new-platform-admin',password);
         const beforeGrant = await post(issuePath(promoted),platform,review);
         assert.equal(beforeGrant.status,200);
         await provisionPlatformAdministrator(pool,{username:promoted.data.user.username});
+        assert.equal((await post(issuePath(promoted),platform,review)).status,403);
         assert.equal((await redeem(promoted,beforeGrant.data.resetCode)).status,400);
       });
       const pendingReset = await post(issuePath(personal),platform,review);

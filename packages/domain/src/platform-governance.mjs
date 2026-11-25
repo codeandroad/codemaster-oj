@@ -125,22 +125,22 @@ async function searchSchoolAdminCandidates(db, url) {
 const loginAccount = `FROM accounts a JOIN identities i ON i.id=a.identity_id
   WHERE a.binding_released_at IS NULL AND i.archived_at IS NULL`;
 const platformGrant = 'EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)';
-const canResetPersonal = `i.kind='personal' AND a.disabled_at IS NULL AND NOT ${platformGrant}
-  AND NOT EXISTS (SELECT 1 FROM school_memberships m WHERE m.account_id=a.id AND (m.revoked_at IS NULL OR m.suspended))
+const canResetPassword = `i.kind IN ('personal','student','teacher') AND a.disabled_at IS NULL AND NOT ${platformGrant}
+  AND NOT EXISTS (SELECT 1 FROM school_memberships m WHERE m.account_id=a.id AND m.role='school_admin' AND (m.revoked_at IS NULL OR m.suspended))
   AND NOT EXISTS (SELECT 1 FROM school_administrators g WHERE g.account_id=a.id AND g.revoked_at IS NULL)`;
 
-export async function lockPersonalResetTarget(db, accountId) {
-  const query = `SELECT a.username ${loginAccount} AND a.id=$1 AND ${canResetPersonal}`;
+export async function lockPlatformResetTarget(db, accountId) {
+  const query = `SELECT a.username ${loginAccount} AND a.id=$1 AND ${canResetPassword}`;
   if (!(await db.query(query+' FOR UPDATE OF a',[accountId])).rowCount) return null;
   // An enrollment or grant could have committed while we waited for the account.
   return (await db.query(query,[accountId])).rows[0];
 }
 
-async function issuePersonalReset(db, actorId, accountId, body) {
+async function issuePlatformReset(db, actorId, accountId, body) {
   const note = field(body.verificationNote, '人工核验记录', {max:300});
-  const account = await lockPersonalResetTarget(db, accountId);
-  if (!account) fail(403,'PERSONAL_RESET_UNAVAILABLE','只可为未入校且登录正常的普通个人账号签发重置码');
-  const resetCode = await issuePasswordResetCode(db, accountId, actorId, {scope:'platform-personal'});
+  const account = await lockPlatformResetTarget(db, accountId);
+  if (!account) fail(403,'ACCOUNT_RESET_UNAVAILABLE','只可为登录正常的普通用户签发重置码');
+  const resetCode = await issuePasswordResetCode(db, accountId, actorId);
   await auditPlatform(db,actorId,'platform.password_reset.issue',{accountId,detail:{verificationNote:note}});
   return result({username:account.username,resetCode});
 }
@@ -150,7 +150,7 @@ async function listLoginAccounts(db, url) {
   const term = field(url.searchParams.get('q') ?? '', '关键词', {min:0,max:100}).toLowerCase();
   const status = enumValue(url.searchParams.get('status') ?? 'all', ['all','enabled','disabled'], '平台登录状态');
   const {rows} = await db.query(`SELECT a.id AS "accountId",a.username,i.name,a.disabled_at IS NOT NULL AS disabled,
-    ${platformGrant} AS "platformAdmin", (${canResetPersonal}) AS "canResetPassword" ${loginAccount}
+    ${platformGrant} AS "platformAdmin", (${canResetPassword}) AS "canResetPassword" ${loginAccount}
     AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0)
     AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
     ORDER BY a.username,a.id LIMIT 51 OFFSET $3`, [term,status,(page-1)*50]);
@@ -261,7 +261,7 @@ export async function handlePlatformGovernance({ pool,user,route,method,body,url
   return transaction(pool, async db => {
     await requirePlatformAdministrator(db, user.id);
     if (accounts) return listLoginAccounts(db,url);
-    if (reset) return issuePersonalReset(db,user.id,uuid(reset[1],'账号 ID'),body);
+    if (reset) return issuePlatformReset(db,user.id,uuid(reset[1],'账号 ID'),body);
     if (login) return setPlatformLogin(db,user.id,uuid(login[1],'账号 ID'),body.disabled);
     if (searching) return searchSchoolAdminCandidates(db,url);
     if (!schoolId && method === 'GET') return listSchools(db,url);

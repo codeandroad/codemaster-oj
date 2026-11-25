@@ -18,7 +18,7 @@ export type Member = {
   accountId: string; username: string; name: string; number: string | null;
   role: SchoolRole; administrator: boolean; classes: string[];
   disabled: boolean; suspended: boolean; canManageAccess: boolean; joinedAt: string; lastLoginAt: string | null;
-  canEditRoles: boolean; canResetPassword: boolean; identityId: string | null; gender: CampusGender | null;
+  canEditRoles: boolean; identityId: string | null; gender: CampusGender | null;
 };
 
 export type AccountFilters = { q: string; classId: string; role: string; status: string; access: string };

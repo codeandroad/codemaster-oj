@@ -7,11 +7,12 @@ import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
+import { hashPassword, tokenHash } from '../../../packages/domain/src/security.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
-test('school administrators issue one-time password reset credentials for members',
+test('platform administrators recover member logins while school administrators manage local records',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async t => {
     const manager = createPool(process.env.TEST_DATABASE_URL);
     const schema = 'reset_' + randomBytes(6).toString('hex');
@@ -22,6 +23,16 @@ test('school administrators issue one-time password reset credentials for member
     const password = randomBytes(24).toString('base64url');
     let app;
     try {
+      await migrate(pool, {through:'051_student_presence.sql'});
+      const historical = [];
+      const hash = await hashPassword(password);
+      for (const kind of ['student','teacher']) {
+        const username = 'historical-' + kind;
+        const {rows:[identity]} = await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$2) RETURNING id',[kind,username]);
+        const {rows:[account]} = await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identity.id,username,hash]);
+        await pool.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[account.id,kind]);
+        historical.push({id:account.id,identityId:identity.id,kind,username});
+      }
       await migrate(pool);
       await bootstrap(pool, { schoolSlug: 'tianxing-chuangshiji', name: 'Legacy admin', number: 'ADM', username: 'legacy-admin', password });
       const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
@@ -55,6 +66,37 @@ test('school administrators issue one-time password reset credentials for member
       const members = `/schools/${schoolId}/members`;
       const reset = (accountId, auth) => request(`${members}/${accountId}/reset`, { method: 'POST', auth });
 
+      const issuer = await registerPersonal(request,'platform-resetter',password);
+      await provisionPlatformAdministrator(pool,{username:'platform-resetter'});
+      const issue = (id, auth = issuer) => request('/platform/accounts/'+id+'/reset', {
+        method:'POST', auth, body:{verificationNote:'Verified account ownership in a manual review.'},
+      });
+      await t.test('platform recovers both migrated Tianxing logins with their original school identities', async () => {
+        for (const {id,identityId,kind,username} of historical) {
+          const login = password => request('/auth/login',{method:'POST',body:{username,password}});
+          const original = await login(password);
+          assert.equal(original.status,200);
+          assert.equal((await reset(id,admin)).status,404);
+          assert.equal((await issue(id,admin)).status,403);
+          assert.equal((await request('/people/'+identityId+'/reset',{method:'POST',auth:admin})).status,410);
+          const issued = await issue(id);
+          assert.equal(issued.status,200);
+          const next = randomBytes(24).toString('base64url');
+          assert.equal((await request('/auth/reset',{method:'POST',body:{username,resetCode:issued.data.resetCode,password:next}})).status,200);
+          assert.equal((await request('/auth/me',{auth:original})).status,401);
+          assert.equal((await login(password)).status,401);
+          const recovered = await login(next);
+          assert.equal(recovered.status,200);
+          assert.equal(recovered.data.user.id,id);
+          const school = (await request('/schools',{auth:recovered})).data.items[0];
+          assert.equal(school.id,schoolId);
+          assert.deepEqual(school.roles,[kind]);
+          const record = await request('/schools/'+schoolId+'/accounts/'+id,{auth:admin});
+          assert.equal(record.data.identityId,identityId);
+          assert.equal(record.data.canResetPassword,false);
+        }
+      });
+
       const personal = await request('/auth/register-personal', {
         method: 'POST', body: { username: 'personal-member', displayName: 'Personal member', password },
       });
@@ -62,8 +104,8 @@ test('school administrators issue one-time password reset credentials for member
       assert.equal((await reset(personal.data.user.id, admin)).status, 404);
 
       await seedUnlinkedMembership(pool,schoolId,personal.data.user.id,'student');
-      assert.equal((await reset(personal.data.user.id, admin)).status, 403);
-      assert.equal((await reset(admin.data.user.id, admin)).status, 403);
+      assert.equal((await reset(personal.data.user.id, admin)).status, 404);
+      assert.equal((await reset(admin.data.user.id, admin)).status, 404);
       const identity = { kind: 'student', name: 'Reset member', number: 'S01' };
       const created = await request(`/schools/${schoolId}/identities`, { method: 'POST', auth: admin, body: identity });
       assert.equal(created.status, 201);
@@ -73,15 +115,35 @@ test('school administrators issue one-time password reset credentials for member
         method:'POST',auth,body:{...facts,schoolSlug,activationCode:code}});
       assert.equal((await claim(student,identity,activation.data.activationCode)).status,200);
       const memberId = student.data.user.id;
-      assert.equal((await reset(memberId,admin)).status,403,'claiming a dossier does not give the school custody of a personal login');
+      assert.equal((await reset(memberId,admin)).status,404,'claiming a dossier does not give the school custody of a personal login');
       // Before personal-first enrollment, school-created logins shared the original membership timestamp.
       const legacyCustody = id => pool.query('UPDATE school_memberships m SET joined_at=a.created_at FROM accounts a WHERE m.account_id=a.id AND m.school_id=$1 AND a.id=$2',[schoolId,id]);
       await legacyCustody(memberId);
       const list = (await request(members, { auth: admin })).data.items;
-      assert.deepEqual(list.filter(member => member.canResetPassword).map(member => member.accountId), [memberId]);
+      assert.ok(list.some(member => member.accountId === memberId));
+      assert.ok(list.every(member => member.canResetPassword === false));
 
-      assert.equal((await reset(memberId, student)).status, 403, 'members cannot issue reset credentials');
-      const issued = await reset(memberId, admin);
+      assert.equal((await issue(memberId,student)).status,403);
+      async function outstandingCode(id, actor, metadata) {
+        const code = randomBytes(24).toString('base64url');
+        await pool.query("INSERT INTO reset_tokens(account_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes')",[id,tokenHash(code)]);
+        await pool.query(`INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata)
+          VALUES($1,'account.reset_issue','account',$2,$3)`,[actor.data.user.id,id,metadata]);
+        return code;
+      }
+      await t.test('outstanding platform codes from the previous release can still be redeemed', async () => {
+        const username = 'previous-platform-code';
+        const holder = await registerPersonal(request,username,password);
+        const code = await outstandingCode(holder.data.user.id,issuer,{scope:'platform-personal'});
+        const next = randomBytes(24).toString('base64url');
+        assert.equal((await request('/auth/reset',{method:'POST',body:{username,resetCode:code,password:next}})).status,200);
+        assert.equal((await request('/auth/login',{method:'POST',body:{username,password:next}})).status,200);
+      });
+      const schoolCode = await outstandingCode(memberId,admin,{schoolId});
+      const retired = await request('/auth/reset',{method:'POST',body:{username:'reset-member',resetCode:schoolCode,password:randomBytes(24).toString('base64url')}});
+      assert.equal(retired.status,400);
+      assert.equal((await request('/auth/login',{method:'POST',body:{username:'reset-member',password}})).status,200);
+      const issued = await issue(memberId);
       assert.equal(issued.status, 200);
       assert.equal(issued.data.username, 'reset-member');
       assert.match(issued.data.resetCode, /^[A-Za-z0-9_-]{32}$/);
@@ -100,7 +162,7 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal(detail.status, 200);
         assert.equal(detail.data.username,'reset-member');
         assert.deepEqual(detail.data.classes,['Reset class']);
-        assert.equal(detail.data.events[0].action,'account.reset_issue');
+        assert.deepEqual(detail.data.events.filter(event=>event.action==='account.reset_issue').map(event=>event.action),['account.reset_issue'], 'only the historical school issuance is visible here');
         assert.equal((await request(directory+'?role=teacher&q=S01',{auth:admin})).data.items.length,0);
         assert.equal((await request(directory+'/'+personal.data.user.id,{auth:admin})).data.lastLoginAt,null);
       });
@@ -128,21 +190,22 @@ test('school administrators issue one-time password reset credentials for member
 
       const newPassword = randomBytes(24).toString('base64url');
       const redeem = resetCode => request('/auth/reset', {method:'POST', body:{username:'reset-member',resetCode,password:newPassword}});
-      const reissued = await reset(memberId, admin);
+      const reissued = await issue(memberId);
       assert.equal(reissued.status, 200);
       assert.equal((await redeem(issued.data.resetCode)).status, 400);
       assert.equal((await redeem(reissued.data.resetCode)).status, 200);
       assert.equal((await request('/auth/me', {auth:student})).status, 401);
       assert.equal((await redeem(reissued.data.resetCode)).status, 400);
       assert.equal((await request('/auth/login', { method:'POST', body:{username:'reset-member',password:newPassword} })).status, 200);
-      const prior = await reset(memberId, admin);
+      const prior = await issue(memberId);
+      assert.equal(prior.status,200);
       await pool.query('INSERT INTO school_administrators(school_id,account_id,granted_by) VALUES($1,$2,$3)', [schoolId,memberId,admin.data.user.id]);
       assert.equal((await redeem(prior.data.resetCode)).status, 400);
-      assert.equal((await reset(memberId, admin)).status, 403);
+      assert.equal((await issue(memberId)).status, 403);
       await pool.query('DELETE FROM school_administrators WHERE school_id=$1 AND account_id=$2', [schoolId,memberId]);
       await provisionSchool(pool, {slug:'second-school',name:'Second School',adminUsername:'reset-member'});
       assert.equal((await redeem(prior.data.resetCode)).status, 400);
-      assert.equal((await reset(memberId, admin)).status, 403);
+      assert.equal((await issue(memberId)).status, 403);
 
       await t.test('batch activation uses the school roster, rejects mixed batches atomically and issues usable codes', async () => {
         const path = `/schools/${schoolId}/identities`;
@@ -224,8 +287,9 @@ test('school administrators issue one-time password reset credentials for member
         const cls = await request(`/schools/${schoolId}/classes`,{auth:admin,method:'POST',body:{name:'Access class',type:'training'}});
         assert.equal((await request(`/schools/${schoolId}/classes/${cls.data.id}/roster`,{auth:admin,method:'POST',body:{identityId:record.data.id}})).status,201);
         const before = (await read(detailPath,admin)).data;
-        assert.equal(before.canResetPassword,true);
-        assert.equal((await reset(id,admin)).status,200);
+        assert.equal(before.canResetPassword,false);
+        assert.equal((await reset(id,admin)).status,404);
+        assert.equal((await issue(id)).status,200);
         assert.equal((await issueClaim(second,secondAdmin)).status,200);
         assert.equal((await setAccess(second.id,admin,true)).status,404);
         assert.equal((await setAccess(schoolId,member,true)).status,403);
@@ -240,7 +304,7 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal((await setLogin(platform,true,peer.data.user.id)).status,403);
         // A paused second affiliation must not transfer global credential custody to the first school.
         assert.equal((await setAccess(second.id,secondAdmin,true)).status,200);
-        assert.equal((await reset(id,admin)).status,403);
+        assert.equal((await reset(id,admin)).status,404);
         assert.equal((await setAccess(second.id,secondAdmin,false)).status,200);
 
         assert.equal((await setAccess(schoolId,admin,true)).status,200);
@@ -290,7 +354,7 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal(after.suspended,false);
         assert.equal(after.events.filter(e=>e.action==='school.account.suspend').length,2);
         const audit = await pool.query('SELECT action FROM platform_audit_events WHERE target_account_id=$1 ORDER BY created_at',[id]);
-        assert.deepEqual(audit.rows.map(row=>row.action),['platform.login.disable','platform.login.restore']);
+        assert.deepEqual(audit.rows.map(row=>row.action),['platform.password_reset.issue','platform.login.disable','platform.login.restore']);
         assert.equal((await pool.query('SELECT count(*)::int n FROM reset_tokens WHERE account_id=$1 AND consumed_at IS NULL',[id])).rows[0].n,0);
       });
     } finally {

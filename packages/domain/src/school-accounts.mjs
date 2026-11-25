@@ -1,6 +1,6 @@
 import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
-import { auditSchool, lockSchoolTeaching, requireSchoolAdmin, schoolCredentialCustodySql } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 
 const accountDirectory = `FROM school_memberships m
   JOIN accounts a ON a.id=m.account_id AND a.binding_released_at IS NULL
@@ -14,6 +14,18 @@ const unprotectedMember = `m.role <> 'school_admin'
 const editableRoles = `NOT m.suspended AND a.disabled_at IS NULL AND ${unprotectedMember}`;
 const presentMembership = '(m.revoked_at IS NULL OR m.suspended)';
 
+const canViewLegacyLastLogin = `m.revoked_at IS NULL AND m.role IN ('student','teacher')
+  AND EXISTS (SELECT 1 FROM school_identities si
+    WHERE si.school_id=m.school_id AND si.account_id=a.id AND si.kind=m.role AND si.archived_at IS NULL
+      AND (si.id=a.identity_id OR (m.joined_at=a.created_at AND EXISTS (
+        SELECT 1 FROM school_activation_tokens activation
+        WHERE activation.school_id=si.school_id AND activation.identity_id=si.id AND activation.consumed_at IS NOT NULL))))
+  AND NOT EXISTS (SELECT 1 FROM school_workspace_roles other
+    WHERE other.account_id=a.id AND (other.school_id<>m.school_id OR other.role='school_admin'))
+  AND NOT EXISTS (SELECT 1 FROM school_memberships other
+    WHERE other.account_id=a.id AND other.school_id<>m.school_id AND other.suspended)
+  AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
+
 async function readAccounts(db, schoolId, accountId, url, actorId) {
   const params = url.searchParams;
   const page = integer(Number(params.get('page') ?? 1), 1, 100000, '页码');
@@ -26,14 +38,13 @@ async function readAccounts(db, schoolId, accountId, url, actorId) {
   const {rows} = await db.query(`SELECT a.id AS "accountId", a.username, coalesce(si.name,i.name) AS name, si.number,
     si.id AS "identityId", si.gender, m.role, m.joined_at AS "joinedAt",
     (m.role='school_admin' OR g.account_id IS NOT NULL) AS administrator, a.disabled_at IS NOT NULL AS disabled,
-    custody.managed AND a.disabled_at IS NULL AS "canResetPassword",
+    false AS "canResetPassword",
     (a.id<>$8 AND ${editableRoles}) AS "canEditRoles",
     m.suspended, (a.id<>$8 AND (m.suspended OR (${unprotectedMember}))) AS "canManageAccess",
-    CASE WHEN custody.managed THEN a.last_login_at END AS "lastLoginAt",
+    CASE WHEN ${canViewLegacyLastLogin} THEN a.last_login_at END AS "lastLoginAt",
     ARRAY(SELECT c.name FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
       WHERE r.school_id=m.school_id AND r.identity_id=si.id AND c.archived_at IS NULL ORDER BY c.name,c.id) AS classes
     ${accountDirectory}
-    CROSS JOIN LATERAL (SELECT (${schoolCredentialCustodySql}) AS managed) custody
     WHERE m.school_id=$1 AND ${presentMembership} AND ($2::uuid IS NULL OR a.id=$2)
       AND ($9='all' OR m.suspended=($9='suspended'))
       AND ($3='' OR strpos(lower(coalesce(si.name,i.name)),lower($3))>0 OR strpos(a.username,lower($3))>0 OR strpos(lower(si.number),lower($3))>0)

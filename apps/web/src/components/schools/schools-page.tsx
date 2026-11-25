@@ -1,6 +1,5 @@
 "use client";
 
-import { ResetCodeDialog, type IssuedResetCode } from "./reset-code-dialog";
 import { AccountAccessAction } from "./account-access-action";
 
 import { LearnerWorkspace } from "./learner-workspace";
@@ -405,8 +404,8 @@ function SchoolMembers({
         </p>
       )}
       <p className="text-sm text-muted-foreground">
-        {text("Password resets are available for student and teacher accounts managed exclusively by this school.",
-          "本校独立管理的学生、教师账号，可在下方成员名单中重置密码。")}
+        {text("Contact a platform administrator to reset a student or teacher’s login password.",
+          "师生忘记登录密码，请联系平台管理员核验并领取重置码。")}
       </p>
       <MemberList
         key={`${revision}-${refreshRevision}`}
@@ -451,9 +450,6 @@ function MemberList({
 }) {
   const text = useSchoolText();
   const { locale } = useLocale();
-  const localError = useSchoolError();
-  const [resetTarget, setResetTarget] = useState<Member | null>(null);
-  const [credential, setCredential] = useState<IssuedResetCode | null>(null);
   const linkedAccount = useSearchParams().get("accountId");
   const [detail, setDetail] = useState<string | null>(linkedAccount);
   const [editingRoles, setEditingRoles] = useState<Member | null>(null);
@@ -512,15 +508,6 @@ function MemberList({
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
                       {member.canEditRoles && <Button variant="secondary" size="sm" onClick={() => setEditingRoles(member)}>{text("Edit roles", "编辑角色")}</Button>}
-                      {member.canResetPassword && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setResetTarget(member)}
-                        >
-                          {text("Reset password", "重置密码")}
-                        </Button>
-                      )}
                       {member.canManageAccess && <AccountAccessAction account={member} access={{scope:"school", school, suspended:member.suspended}} onSaved={members.reload}/>}
                       {!member.suspended && member.role !== "school_admin" &&
                         member.role !== "student" && !member.administrator && (
@@ -576,95 +563,8 @@ function MemberList({
           </div>
         </div>
       </Loading>
-      {resetTarget && (
-        <ResetMemberCredential
-          member={resetTarget}
-          school={school}
-          onClose={() => setResetTarget(null)}
-          onIssued={(issued) => {
-            setResetTarget(null);
-            setCredential(issued);
-          }}
-          text={text}
-          localError={localError}
-        />
-      )}
-      {credential && <ResetCodeDialog credential={credential} onClose={() => setCredential(null)} />}
-    </div>
-  );
-}
 
-function ResetMemberCredential({
-  member,
-  school,
-  onClose,
-  onIssued,
-  text,
-  localError,
-}: {
-  member: Member;
-  school: School;
-  onClose: () => void;
-  onIssued: (issued: { username: string; resetCode: string }) => void;
-  text: (en: string, zh: string) => string;
-  localError: (error: unknown) => Error;
-}) {
-  const action = useMutation();
-  const cancel = useRef<HTMLButtonElement>(null);
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !action.busy) onClose();
-      }}
-    >
-      <DialogContent
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          cancel.current?.focus();
-        }}
-      >
-        <DialogTitle>
-          {text(`Reset ${member.name}'s password?`, `重置 ${member.name} 的密码？`)}
-        </DialogTitle>
-        <DialogDescription>
-          {text(
-            `Generate a one-time reset code for ${member.name} at ${school.name} and hand it to them privately. Their old password is never shown; they set a new one on the sign-in page.`,
-            `为 ${school.name} 的 ${member.name} 生成一次性重置凭据，当面交付本人。旧密码不会显示；本人通过登录页设置新密码。`,
-          )}
-        </DialogDescription>
-        <Feedback action={action} />
-        <div className="flex justify-end gap-2">
-          <Button
-            ref={cancel}
-            variant="secondary"
-            disabled={action.busy}
-            onClick={onClose}
-          >
-            {text("Cancel", "取消")}
-          </Button>
-          <Button
-            disabled={action.busy}
-            aria-busy={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                try {
-                  const issued = await productionApi<{ username: string; resetCode: string }>(
-                    `schools/${school.id}/members/${member.accountId}/reset`,
-                    { method: "POST" },
-                  );
-                  onIssued(issued);
-                } catch (error) {
-                  throw localError(error);
-                }
-              })
-            }
-          >
-            {text("Issue reset code", "签发重置凭据")}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
 

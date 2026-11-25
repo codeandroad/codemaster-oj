@@ -1,21 +1,8 @@
 import { transaction } from './db.mjs';
-import { issuePasswordResetCode } from './password-reset-tokens.mjs';
 import { archiveRemovedStudent, handleSchoolExits } from './school-exits.mjs';
 import { enumValue, fail, field, integer, username, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
-
-export const schoolCredentialCustodySql = `m.revoked_at IS NULL AND m.role IN ('student','teacher')
-  AND EXISTS (SELECT 1 FROM school_identities si
-    WHERE si.school_id=m.school_id AND si.account_id=a.id AND si.kind=m.role AND si.archived_at IS NULL
-      AND (si.id=a.identity_id OR (m.joined_at=a.created_at AND EXISTS (
-        SELECT 1 FROM school_activation_tokens activation
-        WHERE activation.school_id=si.school_id AND activation.identity_id=si.id AND activation.consumed_at IS NOT NULL))))
-  AND NOT EXISTS (SELECT 1 FROM school_workspace_roles other
-    WHERE other.account_id=a.id AND (other.school_id<>m.school_id OR other.role='school_admin'))
-  AND NOT EXISTS (SELECT 1 FROM school_memberships other
-    WHERE other.account_id=a.id AND other.school_id<>m.school_id AND other.suspended)
-  AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
 
 export async function activeAccount(db, accountId) {
   const { rowCount } = await db.query(`
@@ -117,9 +104,9 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
   const exit = await handleSchoolExits({ pool, user, route, method, body, url });
   if (exit) return exit;
   if (route === '/schools' && method === 'GET') return result({ items: await listSchools(pool, user) });
-  const match = route.match(/^\/schools\/([^/]+)\/members(?:\/([^/]+))?(?:\/(reset))?$/);
+  const match = route.match(/^\/schools\/([^/]+)\/members(?:\/([^/]+))?$/);
   if (!match) return null;
-  const [, id, memberId, action] = match;
+  const [, id, memberId] = match;
   const schoolId = uuid(id, '学校 ID');
   if (!memberId && method === 'GET') {
     const page = integer(Number(url.searchParams.get('page') ?? '1'), 1, 100000, '页码');
@@ -131,7 +118,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       await requireSchoolAdmin(db, schoolId, user.id);
       const { rows } = await db.query(`
         SELECT m.account_id AS "accountId", i.name, m.role, m.joined_at AS "joinedAt",
-          g.account_id IS NOT NULL AS has_admin_grant, (${schoolCredentialCustodySql}) AS "canResetPassword"
+          g.account_id IS NOT NULL AS has_admin_grant, false AS "canResetPassword"
           ${unlinked ? ', a.username' : ''}
         FROM school_memberships m JOIN accounts a ON a.id = m.account_id
         JOIN identities i ON i.id = a.identity_id
@@ -149,7 +136,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       return result({ items, page, hasMore: rows.length > 50 });
     });
   }
-  if (memberId && !action && method === 'DELETE') {
+  if (memberId && method === 'DELETE') {
     const target = uuid(memberId, '账号 ID');
     return transaction(pool, async db => {
       await lockSchoolTeaching(db, schoolId);
@@ -170,28 +157,6 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       if (identity) await auditSchool(db, schoolId, user.id, 'school.identity.unlink', identity.id);
       await auditSchool(db, schoolId, user.id, 'school.revoke_membership', target);
       return result({ ok: true });
-    });
-  }
-  if (memberId && action === 'reset' && method === 'POST') {
-    const target = uuid(memberId, '账号 ID');
-    return transaction(pool, async db => {
-      await lockSchoolTeaching(db, schoolId);
-      await requireSchoolAdmin(db, schoolId, user.id);
-      const { rows: [member] } = await db.query(`
-        SELECT m.account_id AS id, a.username
-        FROM school_memberships m JOIN accounts a ON a.id = m.account_id
-        JOIN identities i ON i.id = a.identity_id
-        WHERE m.school_id = $1 AND m.account_id = $2 AND m.revoked_at IS NULL
-          AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
-          AND i.archived_at IS NULL
-        FOR UPDATE OF a`, [schoolId, target]);
-      if (!member) fail(404, 'NOT_FOUND', '本校成员不存在或账号不可用');
-      const eligible = await db.query(`SELECT 1 FROM school_memberships m JOIN accounts a ON a.id=m.account_id
-        WHERE m.school_id=$1 AND m.account_id=$2 AND ${schoolCredentialCustodySql}`, [schoolId, target]);
-      if (!eligible.rowCount) fail(403, 'FORBIDDEN', '只能重置本校独立管理的普通成员账号');
-      const resetCode = await issuePasswordResetCode(db, target, user.id, {schoolId});
-      await auditSchool(db, schoolId, user.id, 'school.account_reset', target);
-      return result({ username: member.username, resetCode });
     });
   }
   return null;

@@ -61,7 +61,6 @@ export class SchoolsController {
     'schools/:schoolId/classes/:classId/roster',
     'schools/:schoolId/classes/:classId/archive',
     'schools/:schoolId/classes/:classId/restore',
-    'schools/:schoolId/members/:accountId/reset',
     'schools/:schoolId/courses',
     'schools/:schoolId/courses/:courseId/publish',
     'schools/:schoolId/courses/:courseId/unpublish',

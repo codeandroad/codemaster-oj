@@ -23,6 +23,8 @@ COMPOSE = ROOT / 'deploy/compose.yaml'
 OVERRIDE = ROOT / 'deploy/compose.ali99.yaml'
 SERVICES = ('web', 'api', 'worker', 'migrate', 'db', 'gateway', 'judge')
 APP_SERVICES = ('web', 'api', 'worker', 'migrate')
+BROWSER_SERVICES = ('api', 'web', 'worker')
+BROWSER_CHECKS = ['formal-runtime-error-and-source-location', 'formal-wrong-answer-output-comparison']
 ARCHIVE = re.compile(r'^(?:ali99-images|images|web-image|web|api|domain|source-updates)\.tar(?:\.gz)?$')
 BACKUP_SUFFIXES = ('.dump', '.pgdump', '.pg_dump', '.backup', '.sql', '.sql.gz', '.sql.zst', '.sql.xz',
                    '.dump.gz', '.dump.zst', '.dump.xz', '.pgdump.gz', '.pgdump.zst', '.pgdump.xz',
@@ -258,6 +260,28 @@ def cleanup(records):
             'freeBeforeMiB': free_before // (1 << 20), 'freeAfterMiB': shutil.disk_usage(BACKUPS).free // (1 << 20)}
 
 
+def browser_receipt(path):
+    require(path.is_file() and path.resolve() == path,
+            f'Missing release browser receipt: {path}. Run npm run check:release on the candidate images.')
+    proof = json.loads(path.read_text())
+    require(isinstance(proof, dict) and proof.get('checks') == BROWSER_CHECKS,
+            'Both formal submission browser checks are required')
+    images = proof.get('images')
+    require(isinstance(images, dict) and set(images) == set(BROWSER_SERVICES),
+            'Browser receipt must identify the tested API, Web and worker images')
+    for service, candidate in images.items():
+        require(isinstance(candidate, dict) and isinstance(candidate.get('tag'), str)
+                and candidate['tag'] and not candidate['tag'].startswith('-')
+                and re.fullmatch(r'sha256:[0-9a-f]{64}', str(candidate.get('id'))),
+                f'Invalid tested image for {service}')
+    return images
+
+
+def check_tested_images(running, tested):
+    for service in BROWSER_SERVICES:
+        require(running[service]['id'] == tested[service]['id'], f'Activated {service} image differs from browser-tested image')
+
+
 def run_release(name):
     work = release_dir(name)
     records = load_history()
@@ -266,6 +290,9 @@ def run_release(name):
     for path in (activate, verify):
         require(path.is_file() and path.resolve() == path and os.access(path, os.X_OK),
                 f'Expected an executable file: {path}')
+    receipt = work / 'release-check.json'
+    tested = browser_receipt(receipt)
+    check_images(tested)
 
     # Legacy activators take this same lock themselves. The separate run lock
     # serializes entry-point runs; hand the old lock to the activator here.
@@ -278,12 +305,14 @@ def run_release(name):
         shutil.copyfile(COMPOSE, rollback / COMPOSE.name)
         shutil.copyfile(OVERRIDE, rollback / OVERRIDE.name)
         shutil.copyfile(ROOT / 'RELEASE', rollback / 'RELEASE')
+        shutil.copyfile(receipt, rollback / receipt.name)
         (rollback / 'images.json').write_text(json.dumps(before, indent=2) + '\n')
     subprocess.run([activate], cwd=work, check=True)
 
     with lock('ali99-release.lock'):
         after = snapshot()
         (rollback / 'activated-images.json').write_text(json.dumps(after, indent=2) + '\n')
+        check_tested_images(after, tested)
         verify_release(work, records, before, after)
 
 
@@ -312,6 +341,7 @@ def resume_release(name):
     before = json.loads((rollback / 'images.json').read_text())
     after = json.loads((rollback / 'activated-images.json').read_text())
     require(before == records[-1]['images'], 'The previous verified release has changed')
+    check_tested_images(after, browser_receipt(rollback / 'release-check.json'))
     verify_release(work, records, before, after)
 
 

@@ -17,6 +17,11 @@ def images(**services):
     return {name: {'tag': tag, 'id': 'sha256:' + tag} for name, tag in services.items()}
 
 
+def browser_images():
+    return {service: {'tag': f'{service}:candidate', 'id': 'sha256:' + digit * 64}
+            for service, digit in zip(release.BROWSER_SERVICES, '123')}
+
+
 def archive(path, files):
     with tarfile.open(path, 'w:gz') as result:
         for name, content in files.items():
@@ -153,7 +158,8 @@ class ReleaseCleanupTest(unittest.TestCase):
             file.write_text('old')
         old = images(web='web:previous')
         before = images(web='web:current')
-        after = images(web='web:candidate')
+        after = browser_images()
+        (candidate / 'release-check.json').write_text(json.dumps({'checks': release.BROWSER_CHECKS, 'images': after}))
         release.save_history([release.record(previous.name, old, {}), release.record(current.name, before, old)])
         with patch.multiple(release, ROOT=self.root, COMPOSE=compose, OVERRIDE=override), \
                 patch.object(release, 'snapshot', side_effect=[before, after, after, after]), \
@@ -162,6 +168,32 @@ class ReleaseCleanupTest(unittest.TestCase):
         self.assertEqual([entry['name'] for entry in release.load_history()], ['previous', 'current', 'candidate'])
         self.assertFalse(obsolete.exists())
         self.assertEqual((candidate / 'rollback' / 'compose.yaml').read_text(), 'old')
+
+    def test_run_refuses_activation_when_either_browser_check_is_missing(self):
+        previous = self.directory('previous')
+        current = self.directory('current')
+        candidate = self.directory('candidate')
+        for step in ('activate', 'verify'):
+            script = candidate / step
+            script.write_text('#!/bin/sh\nexit 0\n')
+            script.chmod(0o700)
+        release.save_history([release.record(previous.name, {}, {}), release.record(current.name, {}, {})])
+        with patch.object(release.subprocess, 'run') as activate:
+            with self.assertRaisesRegex(RuntimeError, 'Missing release browser receipt'):
+                release.run_release(candidate.name)
+            (candidate / 'release-check.json').write_text(json.dumps({
+                'checks': release.BROWSER_CHECKS[:1], 'images': browser_images(),
+            }))
+            with self.assertRaisesRegex(RuntimeError, 'Both formal submission browser checks'):
+                release.run_release(candidate.name)
+            activate.assert_not_called()
+        self.assertFalse((candidate / 'rollback').exists())
+
+    def test_release_rejects_untested_activated_image(self):
+        tested = browser_images()
+        running = {**tested, **images(web='web:different')}
+        with self.assertRaisesRegex(RuntimeError, 'Activated web image differs'):
+            release.check_tested_images(running, tested)
 
 
 if __name__ == '__main__':

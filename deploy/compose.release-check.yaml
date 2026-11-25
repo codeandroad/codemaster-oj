@@ -1,0 +1,30 @@
+# Run with compose.local.yaml and the unique project created by the release check.
+services:
+  db:
+    ports: !reset []
+    networks: !override [business]
+  gateway:
+    ports: !override ['127.0.0.1::3000']
+  api:
+    image: ${RELEASE_CHECK_API_IMAGE:-campus-release-check-api}
+  web:
+    image: ${RELEASE_CHECK_WEB_IMAGE:-campus-release-check-web}
+  worker:
+    image: ${RELEASE_CHECK_WORKER_IMAGE:-campus-release-check-worker}
+  migrate:
+    image: ${RELEASE_CHECK_WORKER_IMAGE:-campus-release-check-worker}
+  judge:
+    image: ${RELEASE_CHECK_JUDGE_IMAGE:-campus-release-check-judge}
+volumes:
+  database:
+    name: ${COMPOSE_PROJECT_NAME:?set a dedicated test project}_database
+networks:
+  edge:
+    ipam:
+      config: [{subnet: '${RELEASE_CHECK_NETWORK:?set a test network}.0/28'}]
+  business:
+    ipam:
+      config: [{subnet: '${RELEASE_CHECK_NETWORK}.16/28'}]
+  execution:
+    ipam:
+      config: [{subnet: '${RELEASE_CHECK_NETWORK}.32/28'}]

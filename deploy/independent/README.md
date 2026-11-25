@@ -25,6 +25,25 @@ in protected private backups and must never enter Git.
 ## Publishing a release
 
 Use `/usr/local/sbin/ali99-release` on ali99 as the release entry point.
+
+Before activation, run the browser check on the machine preparing the release.
+Build the final API, Web and worker images first, including any assets copied
+into the Web image. Install Chromium with the locked Playwright CLI.
+
+```sh
+npm ci --prefix apps/web
+apps/web/node_modules/.bin/playwright-core install chromium
+npm run check:release -- --api-image "$API_IMAGE" --web-image "$WEB_IMAGE" \
+  --worker-image "$WORKER_IMAGE" --receipt "$RELEASE_DIR/release-check.json"
+```
+
+The command starts a disposable Docker Compose project with an empty database
+and a real isolated executor. Pass `--judge-image` to use an existing compatible
+executor image. The browser submits through a published course and verifies both
+the runtime exception and source jump, and the actual and expected answers.
+Missing dependencies, timeouts and assertion failures exit nonzero and produce
+no receipt. Run on a host that can execute the candidate images.
+
 For each release, prepare a new private directory under
 `/srv/codemaster-oj-backups/<release-id>/` with two executable files:
 
@@ -38,6 +57,10 @@ Put disposable files and unpacked build contexts under `staging/`. Put
 release archives (such as `images.tar.gz`, `web.tar.gz` and
 `source-updates.tar.gz`) at the release root or in its `ali99/` subdirectory.
 Keep database backups and rollback materials outside `staging/`.
+Copy `release-check.json` to the release root and load the three tested images
+on ali99 with the same tags before calling `run`. Activation requires both
+checks and matching local image IDs. Release verification also compares the
+activated containers with the tested image IDs.
 
 ```sh
 sudo /usr/local/sbin/ali99-release run <release-id>

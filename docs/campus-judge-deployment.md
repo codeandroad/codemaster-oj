@@ -34,6 +34,16 @@ go-judge 是需要 Linux namespace/cgroup 权限的可信控制器，官方容�
 
 需安装 Docker Engine 与 Compose 插件，预检脚本需 Node.js 24.14 或更新的受支持版本，并准备指向服务器的域名及防火墙规则。私有校园域名无法取得公网证书时，应接学校受信任的 HTTPS 入口或配置学校 CA；生产 API 强制 Secure Cookie 和 HTTPS 来源，不使用 HTTP 绕过此要求。
 
+首次发布和升级都须在构建机通过浏览器发布检查。它在新建的测试数据库中走真实的正式提交，检查异常和源码跳转、实际输出和预期结果。浏览器、Docker 或隔离评测环境不可用时，命令失败。浏览器由项目锁定版本的 Playwright CLI 安装。
+
+```sh
+npm ci --prefix apps/web
+apps/web/node_modules/.bin/playwright-core install chromium
+npm run check:release
+```
+
+ali99 发布入口会核对通过记录和实际部署的镜像 ID。准备预构建镜像及通过记录的方法见 [ali99 发布流程](../deploy/independent/README.md#publishing-a-release)。
+
 ```sh
 cp deploy/.env.example deploy/.env
 # 编辑域名与来源，并为五个 secret 字段分别填写 openssl rand -hex 32 的结果。

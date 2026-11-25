@@ -88,7 +88,7 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
 
   return <Modal wide title={text("Generate claim codes", "批量生成认领码")} onClose={close}
     description={result
-      ? text("Give each person their own code privately. Use Claim an identity or apply to join after signing in. Copy the codes before closing.", "请将认领信息分别私下交给本人，登录后进入“设置 → 学校”，选择“加入学校”。关闭前请复制留存。")
+      ? text("Give each person their own code privately. Ask them to sign in and select “Join a school” in Settings → Schools. Copy the codes before closing.", "请将认领信息分别私下交给本人，登录后进入“设置 → 学校”，选择“加入学校”。关闭前请复制留存。")
       : text(`Select unlinked identities at ${school.name}. Each code works once for seven days. Issuing a new code replaces the previous one.`,
           `请选择${school.name}待认领的身份。每人一码，有效期七天。重新签发后，该身份的旧码立即失效。`)}>
     {result ? <>

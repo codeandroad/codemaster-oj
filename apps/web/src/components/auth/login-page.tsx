@@ -90,7 +90,7 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
   return <AuthShell>
     <header>
       <h2 ref={titleRef} tabIndex={-1} id="login-title" className={styles.title}>{mode === "login" ? t("登录") : t("重置密码")}</h2>
-      <p className={styles.description}>{mode === "login" ? joinIntent ? tx("登录后可认领校内身份或提交入校申请。", "Sign in to claim your school identity or apply to join.") : tx("登录后继续课程学习与编程练习。", "Continue your courses and coding practice.") : t("请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
+      <p className={styles.description}>{mode === "login" ? joinIntent ? tx("登录后，在「设置 → 学校」中选择「加入学校」。", "After signing in, open Settings → Schools and select “Join a school”.") : tx("登录后继续课程学习与编程练习。", "Continue your courses and coding practice.") : t("请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
     </header>
     {mode === "reset" && <details className={styles.help}>
       <summary>{tx("如何获取重置凭据？", "How do I get a reset code?")}</summary>
@@ -131,6 +131,6 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
       </Button>
       <Button type="button" variant="link" className={styles.forgot} disabled={busy} onClick={switchMode}>{t(mode === "login" ? "忘记密码？" : "返回登录")}</Button>
     </form>
-    <Link href={joinIntent ? "/register?join=1" : "/register"} className={`${buttonVariants({ variant: "secondary" })} ${styles.registerAction}`}>{tx("创建个人账号", "Create a personal account")}</Link><div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm"><Link href="/schools?join=1" className="font-semibold text-primary hover:underline">{tx("认领身份或申请入校", "Claim an identity or apply to join")}</Link></div>
+    <Link href={joinIntent ? "/register?join=1" : "/register"} className={`${buttonVariants({ variant: "secondary" })} ${styles.registerAction}`}>{tx("创建个人账号", "Create a personal account")}</Link>
   </AuthShell>;
 }

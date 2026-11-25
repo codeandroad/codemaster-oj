@@ -104,12 +104,12 @@ export function PersonalRegisterPage({
         <p className={styles.description}>
           {joinIntent
             ? text(
-                "Create your account, then claim your identity or apply to join a school.",
-                "先创建个人账号，再认领校内身份或申请入校。",
+                "Create your account, then select “Join a school” in Settings → Schools.",
+                "注册后，在「设置 → 学校」中选择「加入学校」。",
               )
             : text(
-                "Practice independently. You can also claim a school identity or apply to join.",
-                "可独立学习公开课程与题目，也可认领校内身份或申请入校。",
+                "Study independently, or join a school after registration through Settings → Schools.",
+                "注册后可独立学习公开课程，也可从「设置 → 学校」加入学校。",
               )}
         </p>
       </header>
@@ -268,12 +268,6 @@ export function PersonalRegisterPage({
           className="font-semibold text-primary hover:underline"
         >
           {text("Already registered? Sign in", "已有账号？登录")}
-        </Link>
-        <Link
-          href="/activate"
-          className="text-muted-foreground hover:text-primary hover:underline"
-        >
-          {text("Already have a school claim code?", "已有学校身份认领码？")}
         </Link>
       </div>
     </AuthShell>

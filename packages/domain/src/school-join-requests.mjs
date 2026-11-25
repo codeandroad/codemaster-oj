@@ -1,6 +1,7 @@
+import { isDeepStrictEqual } from 'node:util';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
-import { insertSchoolIdentity, readClassIds } from './school-identity-record.mjs';
+import { identityClasses, insertSchoolIdentity, readClassIds, replaceIdentityClasses } from './school-identity-record.mjs';
 import { canonicalHash, enumValue, fail, field, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
@@ -59,18 +60,24 @@ export async function closePendingSchoolRequests(db, schoolId, accountId, actorI
 // Include bound and archived records during duplicate review, but never offer
 // either as a link target. The version covers the facts the reviewer saw.
 async function reviewMatches(db, schoolId, request) {
-  const { rows: records } = await db.query(
+  const { rows } = await db.query(
     `SELECT i.id,i.name,i.number,
       CASE WHEN i.archived_at IS NOT NULL THEN 'archived' WHEN i.account_id IS NOT NULL THEN 'linked' ELSE 'available' END AS status,
-      ARRAY(SELECT c.name FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
-        WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.archived_at IS NULL ORDER BY c.name,c.id) AS classes
+      ${identityClasses}
       FROM school_identities i WHERE i.school_id=$1 AND i.kind=$2 AND (i.name=$3 OR i.number=$4)
       ORDER BY i.number,i.id`,
     [schoolId, request.kind, request.name, request.number],
   );
-  const items = records
-    .filter(r => r.status === 'available' && r.name === request.name && (!request.number || r.number === request.number))
-    .map(({ id, number, classes }) => ({ id, number, classes }));
+  const records = [];
+  const items = [];
+  for (const {classes, ...record} of rows) {
+    const active = classes.filter(c => !c.archived);
+    const names = active.map(c => c.name);
+    records.push({...record, classes: names});
+    if (record.status === 'available' && record.name === request.name && (!request.number || record.number === request.number)) {
+      items.push({id: record.id, number: record.number, classes: names, classIds: active.map(c => c.id)});
+    }
+  }
   return { items, records, version: canonicalHash(records) };
 }
 
@@ -155,8 +162,12 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
     const createNumber = body.createNumber === undefined ? null : field(body.createNumber, '校内学号', { max:64 });
     if (createNumber && (decision !== 'approved' || body.identityId != null))
       fail(400, 'VALIDATION', '请选择关联已有档案或新建学生档案');
-    if (!createNumber && body.classIds !== undefined)
-      fail(400, 'VALIDATION', '仅在审核中新建学生档案时可分配班级');
+    const linkingWithClasses = !createNumber && decision === 'approved' && body.classIds !== undefined;
+    if (decision === 'rejected' && body.classIds !== undefined)
+      fail(400, 'VALIDATION', '仅在批准学生入校时可分配班级');
+    if (linkingWithClasses !== (body.expectedClassIds !== undefined))
+      fail(400, 'VALIDATION', '调整已有档案的班级须同时提供原班级和所选班级');
+    const expectedClasses = linkingWithClasses ? readClassIds(body.expectedClassIds) : null;
     const classIds = body.classIds === undefined ? [] : readClassIds(body.classIds).sort();
     let identityId = decision === 'approved' && !createNumber ? uuid(body.identityId, '身份档案') : null;
     const {
@@ -166,11 +177,14 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       id,
     ]);
     if (!request) fail(404, 'NOT_FOUND', '入校申请不存在');
+    if (linkingWithClasses && request.kind !== 'student')
+      fail(400, 'VALIDATION', '仅在批准学生入校时可分配班级');
     if (request.status !== 'pending') {
       const sameTarget = createNumber
         ? request.created_student_number === createNumber && request.verification_method === body.verificationMethod
-          && request.created_class_ids.length === classIds.length && classIds.every((classId, index) => classId === request.created_class_ids[index])
-        : request.identity_id === identityId;
+          && isDeepStrictEqual(request.created_class_ids, classIds)
+        : request.identity_id === identityId && request.created_student_number === null
+          && isDeepStrictEqual(request.linked_class_ids, linkingWithClasses ? classIds : null);
       if (request.status === decision && sameTarget)
         return result({ id, status: decision });
       fail(409, 'ALREADY_REVIEWED', '申请状态已变更，请刷新');
@@ -184,21 +198,25 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       identityId = identity.id;
     } else if (identityId) {
       const match = await db.query(
-        `SELECT id,kind FROM school_identities WHERE school_id=$1 AND id=$2 AND kind=$3
+        `SELECT i.id,i.kind,${identityClasses} FROM school_identities i WHERE i.school_id=$1 AND i.id=$2 AND i.kind=$3
         AND ($4::text IS NULL OR number=$4) AND name=$5 AND account_id IS NULL AND archived_at IS NULL FOR UPDATE`,
         [schoolId, identityId, request.kind, request.number, request.name],
       );
       identity = match.rows[0];
       if (!identity) fail(409, 'IDENTITY_UNAVAILABLE', '请重新核对本校未关联的身份档案');
+      if (linkingWithClasses) {
+        await replaceIdentityClasses(db, schoolId, user.id, identityId, identity.classes, expectedClasses, classIds);
+      }
     }
     if (identity) {
       await bindSchoolIdentity(db, schoolId, request.account_id, identity, user.id, id);
       await auditSchool(db, schoolId, user.id, 'school.identity.link', identityId);
     }
     await db.query(
-      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5,created_student_number=$6,created_class_ids=$7
+      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5,
+      created_student_number=$6,created_class_ids=$7,linked_class_ids=$8
       WHERE id=$1`,
-      [id, decision, identityId, user.id, verification, createNumber, classIds],
+      [id, decision, identityId, user.id, verification, createNumber, createNumber ? classIds : [], linkingWithClasses ? classIds : null],
     );
     await auditSchool(db, schoolId, user.id, 'school.join_request.' + decision, id);
     return result({ id, status: decision });

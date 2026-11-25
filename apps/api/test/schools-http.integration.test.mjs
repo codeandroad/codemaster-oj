@@ -297,6 +297,82 @@ test('school claims and reviewed applications stay within each school on the rea
         assert.deepEqual(await assigned(), [a]);
       });
 
+      await t.test('link approval starts from the student roster and applies class changes with the account binding', async () => {
+        const classes = '/schools/'+alpha.id+'/classes';
+        async function newClass(name, school = alpha, admin = alphaAdmin) {
+          const response = await post('/schools/'+school.id+'/classes',admin,{name,type:'training'});
+          assert.equal(response.status,201);
+          return response.data.id;
+        }
+        const a = await newClass('Review A'), b = await newClass('Review B'), c = await newClass('Review C');
+        const historical = await newClass('Old class'), outside = await newClass('Review A',beta,betaAdmin);
+        async function existing(username, classIds, {numberProvided = true, kind = 'student'} = {}) {
+          const account = await registerPersonal(request,username,password);
+          const facts = {kind,number:username,name:'Learner '+username};
+          const record = await make(alpha,alphaAdmin,{...facts,classIds});
+          const application = await post(path(alpha),account,numberProvided ? facts : {...facts,number:null,rosterHint:'Homeroom'});
+          assert.equal(application.status,201);
+          const endpoint = path(alpha)+'/'+application.data.id;
+          return {
+            id:record.id, account,
+            snapshot: async () => (await request(endpoint+'/candidates',{auth:alphaAdmin})).data.items,
+            approve: (selection, admin = alphaAdmin) => post(endpoint+'/decision',admin,{decision:'approved', identityId:record.id,
+              ...(!numberProvided && {verificationMethod:'in_person'}), ...selection}),
+            visible: async () => (await request(classes,{auth:account})).data.items.map(row=>row.id).sort(),
+            roster: async () => (await request('/schools/'+alpha.id+'/identities/'+record.id+'/classes',{auth:alphaAdmin})).data.classes,
+          };
+        }
+        const student = await existing('prefilled-student',[a,historical],{numberProvided:false});
+        assert.equal((await post(classes+'/'+historical+'/archive',alphaAdmin,{expectedRevision:1})).status,200);
+        assert.deepEqual((await student.snapshot())[0].classIds,[a]);
+        const change = {expectedClassIds:[a],classIds:[b]};
+        assert.equal((await student.approve(change,betaAdmin)).status,404);
+        assert.equal((await student.approve(change,student.account)).status,404);
+        assert.equal((await student.approve({...change,classIds:[outside]})).status,404);
+        assert.equal((await student.approve({...change,classIds:[historical]})).status,409);
+        assert.equal((await student.approve({...change,verificationMethod:undefined})).status,400);
+        assert.equal((await post(classes+'/'+c+'/roster',alphaAdmin,{identityId:student.id})).status,201);
+        assert.equal((await student.approve(change)).data.error.code,'ROSTER_CHANGED');
+        assert.deepEqual((await request('/schools',{auth:student.account})).data.items,[]);
+        const current = (await student.snapshot())[0].classIds;
+        assert.deepEqual(current.sort(),[a,c].sort());
+        const confirmed = {expectedClassIds:current,classIds:[b,c]};
+        const repeated = await Promise.all([student.approve(confirmed),student.approve({...confirmed,classIds:[c,b,b]})]);
+        assert.deepEqual(repeated.map(r=>r.status),[200,200]);
+        assert.deepEqual(await student.visible(),[b,c].sort());
+        assert.deepEqual((await student.roster()).map(row=>row.id).sort(),[b,c,historical].sort());
+        assert.equal((await student.approve({...confirmed,classIds:[a]})).status,409);
+        const audit = await pool.query("SELECT count(*)::int AS n FROM school_audit_events WHERE target_id=$1 AND action='school.roster.remove'",[student.id]);
+        assert.equal(audit.rows[0].n,1);
+        assert.equal((await request('/schools/'+alpha.id+'/identities/'+student.id+'/classes',{
+          auth:alphaAdmin,method:'PATCH',body:{expectedClassIds:[b,c],classIds:[b]},
+        })).status,200);
+        assert.equal((await student.approve(confirmed)).status,200);
+        assert.deepEqual(await student.visible(),[b]);
+        for (const [username,original,desired] of [
+          ['first-placement',[],[a,b]], ['keep-placement',[a],[a]], ['clear-placement',[b],[]],
+        ]) {
+          const person = await existing(username,original);
+          const [candidate] = await person.snapshot();
+          assert.equal(candidate.id,person.id);
+          assert.deepEqual(candidate.classIds,original);
+          assert.equal((await person.approve({expectedClassIds:candidate.classIds,classIds:desired})).status,200);
+          assert.deepEqual(await person.visible(),[...desired].sort());
+        }
+        const staff = await existing('staff-placement',[a],{kind:'teacher'});
+        assert.equal((await staff.approve(change)).status,400);
+        assert.equal((await staff.approve({})).status,200);
+        assert.deepEqual(await staff.visible(),[a]);
+        const suspended = await existing('paused-placement',[a]);
+        await seedUnlinkedMembership(pool,alpha.id,suspended.account.data.user.id,'student');
+        assert.equal((await request('/schools/'+alpha.id+'/accounts/'+suspended.account.data.user.id+'/access',{
+          method:'PATCH',auth:alphaAdmin,body:{suspended:true},
+        })).status,200);
+        assert.equal((await suspended.approve(change)).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
+        assert.deepEqual((await suspended.roster()).map(row=>row.id),[a]);
+        assert.equal((await suspended.snapshot())[0].id,suspended.id);
+      });
+
       // Members who previously used a general invitation can finish linking their original dossier.
       await seedUnlinkedMembership(pool,beta.id,another.data.user.id,'student');
       const memberFacts={kind:'student',name:'Previous member',number:'S003'};

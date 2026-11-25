@@ -1,4 +1,6 @@
-import { addToClassRosters, identityFields, insertSchoolIdentity, readClassIds, requireActiveClasses } from './school-identity-record.mjs';
+import {
+  addToClassRosters, identityClasses, identityFields, insertSchoolIdentity, readClassIds, removeFromClassRosters, replaceIdentityClasses,
+} from './school-identity-record.mjs';
 import { closePendingSchoolRequests } from './school-join-requests.mjs';
 import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
@@ -7,10 +9,6 @@ import { canonicalHash, enumValue, fail, field, genderValue, integer, uuid } fro
 
 const PAGE_SIZE = 50;
 const IDENTITY_KINDS = ['student', 'teacher'];
-const identityClasses = `(SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name,
-  'archived', c.archived_at IS NOT NULL) ORDER BY c.name, c.id), '[]') FROM school_class_roster r
-  JOIN school_classes c ON c.school_id = r.school_id AND c.id = r.class_id
-  WHERE r.school_id = i.school_id AND r.identity_id = i.id) AS classes`;
 const assignedTeacher = `EXISTS (
   SELECT 1 FROM school_class_roster r
   JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
@@ -152,18 +150,7 @@ async function manageIdentityClasses(db, schoolId, actorId, identityId, method, 
 
   const expected = readClassIds(body.expectedClassIds);
   const desired = readClassIds(body.classIds);
-  const current = new Set(identity.classes.filter(c => !c.archived).map(c => c.id));
-  const additions = desired.filter(id => !current.has(id));
-  const selected = new Set(desired);
-  const removals = [...current].filter(id => !selected.has(id));
-  if (additions.length || removals.length) {
-    if (expected.length !== current.size || expected.some(id => !current.has(id))) {
-      fail(409, 'ROSTER_CHANGED', '班级名单已变更，请重新加载后确认');
-    }
-    await requireActiveClasses(db, schoolId, additions);
-    if (additions.length) await addToClassRosters(db, schoolId, actorId, identityId, additions);
-    if (removals.length) await removeFromClassRosters(db, schoolId, actorId, identityId, removals);
-  }
+  await replaceIdentityClasses(db, schoolId, actorId, identityId, identity.classes, expected, desired);
   return { status: 200, body: { ok: true } };
 }
 
@@ -353,16 +340,6 @@ async function removeRosterIdentity(db, schoolId, actorId, role, classId, identi
   const rowCount = await removeFromClassRosters(db, schoolId, actorId, identityId, [classId]);
   if (!rowCount) fail(404, 'NOT_FOUND', '班级名单中未找到该身份档案');
   return { status: 200, body: { ok: true } };
-}
-
-async function removeFromClassRosters(db, schoolId, actorId, identityId, classIds) {
-  const { rowCount } = await db.query(`WITH removed AS (
-    DELETE FROM school_class_roster WHERE school_id=$1 AND identity_id=$3 AND class_id=ANY($4::uuid[])
-    RETURNING school_id, identity_id
-  )
-  INSERT INTO school_audit_events (school_id, actor_account_id, action, target_id)
-  SELECT school_id, $2, 'school.roster.remove', identity_id FROM removed`, [schoolId, actorId, identityId, classIds]);
-  return rowCount;
 }
 
 export async function handleSchoolTeaching({ pool, user, route, method, body, url }) {

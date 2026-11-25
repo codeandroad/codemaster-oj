@@ -141,6 +141,7 @@ const english: Record<string, string> = {
   "两次输入的新密码不一致。": "The new passwords do not match.", "密码已重置，请使用新密码登录。": "Password reset. Sign in with your new password.",
   "账号已禁用": "Account disabled", "用户名或密码不正确": "Incorrect username or password",
   "该编号的档案已删除，请在“已删除”列表恢复后编辑。": "This ID belongs to a deleted record. Restore it from Deleted records before editing.",
+  "班级名单已变更，请重新加载后确认": "Class assignments changed. Review the updated selection before saving.",
   "请选择使用中的班级": "A selected class was archived. Choose an active class.",
   "班级不存在或不可访问": "A selected class is unavailable. Check the class selection.",
   "档案已变更，请重新核对": "School records changed. Check the updated records before approving.",

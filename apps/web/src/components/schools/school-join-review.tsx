@@ -62,10 +62,10 @@ export function SchoolJoinReview({ schoolId, onChanged }: { schoolId: string; on
 
 type ReviewRecords = {
   version: string | null;
-  items: {id: string; number: string; classes: string[]}[];
+  items: {id: string; number: string; classes: string[]; classIds: string[]}[];
   records: {id: string; name: string; number: string; classes: string[]; status: "archived" | "linked" | "available"}[];
 };
-type Approval = { identityId: string; verificationMethod?: string } |
+type Approval = { identityId: string; verificationMethod?: string; expectedClassIds?: string[]; classIds?: string[] } |
   { createNumber: string; classIds: string[]; verificationMethod: string; distinctStudent: boolean; recordsVersion: string };
 
 function ReviewDialog({ schoolId, application, onClose, onReviewed }: {
@@ -109,13 +109,14 @@ function ReviewForm({ schoolId, application, matches, busy, decide }: {
 }) {
   const t = useSchoolText();
   const recordsHref = schoolWorkspaceHref(schoolId, "identities");
-  const [classIds, setClassIds] = useState<string[]>([]);
+  const [selection, setSelection] = useState<string[] | null>(null);
   const [choice, setChoice] = useState(application.number ? matches.items[0]?.id ?? "" : "");
   const [creating, setCreating] = useState(application.kind === "student" && !matches.items.length);
   const [number, setNumber] = useState(application.number ?? "");
   const [verification, setVerification] = useState("");
   const [distinct, setDistinct] = useState(false);
   const selected = matches.items.find(record => record.id === choice);
+  const classIds = selection ?? (creating ? [] : selected?.classIds ?? []);
   const numberTaken = matches.records.some(record => record.number === number.trim());
   const sameName = matches.records.some(record => record.name === application.name);
   const needsVerification = creating || !application.number;
@@ -123,7 +124,7 @@ function ReviewForm({ schoolId, application, matches, busy, decide }: {
     ? !!number.trim() && !numberTaken && (!sameName || distinct) : !!selected);
   function switchMode() {
     setCreating(!creating);
-    setClassIds([]);
+    setSelection(null);
     setDistinct(false);
     setVerification("");
   }
@@ -136,7 +137,10 @@ function ReviewForm({ schoolId, application, matches, busy, decide }: {
     if (creating && matches.version) {
       decide({createNumber: number.trim(), classIds, verificationMethod: verification, distinctStudent: distinct, recordsVersion: matches.version});
     } else if (selected) {
-      decide({identityId: selected.id, verificationMethod: needsVerification ? verification : undefined});
+      decide({
+        identityId: selected.id, verificationMethod: needsVerification ? verification : undefined,
+        ...(application.kind === "student" && {expectedClassIds: selected.classIds, classIds}),
+      });
     }
   }}>
     <fieldset disabled={busy} className="space-y-3">
@@ -158,13 +162,9 @@ function ReviewForm({ schoolId, application, matches, busy, decide }: {
           <input type="checkbox" name="distinctStudent" checked={distinct} onChange={e => setDistinct(e.target.checked)} />
           {t("I checked the same-name records above. Each belongs to a different student from this applicant.", "我已核对以上同名档案，确认均不属于申请人。")}
         </label>}
-        {!numberTaken && <fieldset className="space-y-2">
-          <legend className="text-sm font-semibold">{t("Student classes (optional)", "所在班级（可选）")}</legend>
-          <SchoolClassPicker schoolId={schoolId} selected={classIds} onChange={setClassIds} />
-        </fieldset>}
       </> : <>
         {!application.number && <label className="block">{t("Same-name school records", "本校同名档案")}
-          <select className={inputClass} name="identityId" value={choice} onChange={e => { setChoice(e.target.value); setVerification(""); }}>
+          <select className={inputClass} name="identityId" value={choice} onChange={e => { setChoice(e.target.value); setSelection(null); setVerification(""); }}>
             <option value="">{t("Choose the verified record", "请选择已核实的档案")}</option>
             {matches.items.map(record => <option key={record.id} value={record.id}>
               {application.name} · {record.number} · {record.classes.join("、") || t("No class assigned", "未分班")}
@@ -179,6 +179,10 @@ function ReviewForm({ schoolId, application, matches, busy, decide }: {
       {application.kind === "student" && !application.number && matches.items.length > 0 &&
         <Button variant="secondary" size="sm" type="button" onClick={switchMode}>{creating ? t("Use an existing record", "选择已有档案")
           : t("Create a record for a different student with this name", "为另一名同名学生建档")}</Button>}
+      {application.kind === "student" && (creating ? !numberTaken : !!selected) && <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">{t("Student classes (optional)", "所在班级（可选）")}</legend>
+        <SchoolClassPicker schoolId={schoolId} selected={classIds} onChange={setSelection} />
+      </fieldset>}
       {needsVerification && (selected || creating) && (!creating || !numberTaken) && <label className="block">
         {t("How did you verify the applicant?", "如何核实申请人身份？")}
         <select required className={inputClass} name="verificationMethod" value={verification} onChange={e => setVerification(e.target.value)}>

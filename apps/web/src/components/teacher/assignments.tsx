@@ -35,7 +35,7 @@ import {
   type SubmissionLanguage,
 } from "@/lib/production-api";
 import { assignmentHref, teacherAssignment, teacherAssignmentReport, type AssignmentReport, type ManagedActivity, type SchoolAssignmentOptions } from "./school-assignment-data";
-import { schoolWorkspaceHref } from "../schools/school-workspace-location";
+import { schoolClassApiPath, schoolWorkspaceHref } from "../schools/school-workspace-location";
 import { ActivityAssistanceFields, defaultActivityAssistance, type ActivityRule } from "../schools/school-scholarship";
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
@@ -265,7 +265,7 @@ function AssignmentEditorForm({
 }) {
   const { locale } = useLocale();
   const schoolBase = schoolId ? `schools/${schoolId}/activities` : "";
-  const options = useData<SchoolAssignmentOptions>(schoolId ? schoolBase+"/options?view=assignment" : null);
+  const options = useData<SchoolAssignmentOptions>(schoolId ? schoolClassApiPath(schoolBase+"/options?view=assignment") : null);
   const requestId = useRef(crypto.randomUUID());
   const [startsAt,setStartsAt] = useState(localInput(initial?.startsAt ?? ""));
   const [rewardEdit, setRewardEdit] = useState<RewardRule | null>(null);
@@ -580,13 +580,13 @@ function AssignmentEditorForm({
             startsAt:startsAt ? activityDate(startsAt,"开放时间") : null,endsAt:dueAt,requestId:requestId.current,expectedRevision:saved?.editRevision,
             ...((changedReward || changedAssistance) && completionReward && {scholarshipRule:{...completionReward,expectedRevision:completionReward.version,...(changedAssistance && {assistance:assistanceEdit})}})};
         const path=saved ? `${schoolBase}/${saved.id}${published?"/manage":""}` : schoolBase;
-        let value=await productionApi<ManagedActivity>(path,{method:saved?"PATCH":"POST",body:payload});
+        let value=await productionApi<ManagedActivity>(schoolClassApiPath(path),{method:saved?"PATCH":"POST",body:payload});
         result=teacherAssignment(value);
         setSaved(result);
         draft.clear();
         if (assign) {
           try {
-            value=await productionApi<ManagedActivity>(`${schoolBase}/${value.id}/publish`,{method:"POST",body:{
+            value=await productionApi<ManagedActivity>(schoolClassApiPath(`${schoolBase}/${value.id}/publish`),{method:"POST",body:{
               expectedRevision:value.revision,expectedRuleRevision:(baseReward?.version??0)+((changedReward || changedAssistance)?1:0)}});
           } catch (error) {
             setRewardEdit(null); setAssistanceEdit(null); schoolRule.reload(); setPublish(false);

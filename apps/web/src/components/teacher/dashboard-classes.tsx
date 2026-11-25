@@ -12,7 +12,7 @@ import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { genderLabel } from "@/lib/gender";
 import type { SchoolActivity } from "@/components/schools/school-activities-model";
-import { schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
+import { schoolClassApiPath, schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
 import {
   productionApi,
   type Assignment,
@@ -58,7 +58,7 @@ export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const base = schoolId ? `schools/${schoolId}` : null;
-  const classes = useData<{ items: Pick<SchoolClass, "id" | "name">[]; hasMore?: boolean }>(base ? `${base}/classes` : "classes");
+  const classes = useData<{ items: Pick<SchoolClass, "id" | "name">[]; hasMore?: boolean }>(base ? schoolClassApiPath(`${base}/classes`) : "classes");
   const assignments = useData<{ items: TeacherAssignment[] }>(base ? null : "assignments");
   const schoolAssignments = useData<{ items: SchoolActivity[]; hasMore: boolean }>(base ? `${base}/activities?kind=assignment` : null);
   const report = useData<{

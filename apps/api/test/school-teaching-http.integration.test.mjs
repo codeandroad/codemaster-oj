@@ -630,6 +630,62 @@ test('school directories and class rosters enforce tenant, role, and account bou
         SELECT count(*)::int count FROM school_audit_events
         WHERE school_id = $1 AND target_id = $2 AND action = 'school.roster.add'`, [alpha.id, alphaStudent.id]);
       assert.equal(studentAudit.count, 4);
+
+      await t.test('revocation takes effect within the same teaching session for both forms of school administrator', async () => {
+        const api = schoolPath(originalCampus, '');
+        const directory = api + 'classes';
+        const teaching = path => path + (path.includes('?') ? '&' : '?') + 'schoolRole=teacher';
+        const { data: target } = await post(directory, campusAdmin, { name: 'Former class', type: 'training' });
+        const { data: retained } = await post(directory, campusAdmin, { name: 'Current class', type: 'training' });
+        const { data: pupil } = await post(api+'identities', campusAdmin, { kind: 'student', number: 'R01', name: 'Roster student' });
+        const migrated = (await request(api+'identities?kind=school_admin', { auth: campusAdmin })).data.items.find(i=>i.accountId===campusAdmin.id);
+        assert.equal(migrated.kind, 'school_admin');
+        await seedUnlinkedMembership(pool, originalCampus.id, betaAdmin.id, 'teacher');
+        const { data: instructor } = await post(api+'identities', campusAdmin, { kind: 'teacher', number: 'R02', name: 'Dual role teacher', accountId: betaAdmin.id });
+        await request(directory+'/'+target.id+'/candidates?schoolRole=admin', { auth: betaAdmin, status: 404 });
+        await patch(api+'accounts/'+betaAdmin.id+'/roles', campusAdmin, {
+          role:'teacher', expectedRole:'teacher', administrator:true, expectedAdministrator:false,
+        });
+        const targetPath = directory+'/'+target.id;
+        const rosterPath = targetPath+'/roster';
+        let revision = target.revision;
+        for (const [auth, dossier] of [[campusAdmin, migrated], [betaAdmin, instructor]]) {
+          const read = async path => (await request(teaching(path), { auth })).data;
+          assert.deepEqual((await read(directory+'?view=choices')).items, []);
+          assert.ok((await request(targetPath+'/candidates?kind=teacher', { auth: campusAdmin })).data.items.some(i=>i.id===dossier.id));
+          await post(rosterPath, campusAdmin, {identityId:dossier.id, permissions:{canRename:true,canManageStudents:true}});
+          await post(directory+'/'+retained.id+'/roster', campusAdmin, {identityId:dossier.id, permissions:{canRename:false,canManageStudents:false}});
+          assert.equal((await read(directory)).canCreate, false);
+          assert.deepEqual((await read(directory)).items.map(i=>[i.id,i.canRename,i.canManageStudents]).sort(),
+            [[retained.id,false,false],[target.id,true,true]].sort());
+          assert.ok((await read(rosterPath+'?kind=teacher')).items.some(i=>i.id===dossier.id && i.kind==='teacher'));
+          await request(teaching(directory+'/'+retained.id+'/candidates'), { auth, status:403 });
+          const {data:renamed} = await patch(teaching(targetPath), auth, {name:'Updated '+dossier.number,expectedRevision:revision});
+          revision = renamed.revision;
+          await post(teaching(rosterPath), auth, {identityId:pupil.id});
+          const input = {kind:'student',classId:target.id,rows:[{number:'IMP-REVOKED',name:'Uncommitted student'}]};
+          const {data:preview} = await post(teaching(api+'identity-imports/preview'), auth, input, 200);
+          // Revoke only this roster entry. The session, administrator grant and other assignment stay active.
+          await remove(rosterPath+'/'+dossier.id, campusAdmin);
+          assert.deepEqual((await read(directory+'?view=choices')).items.map(c=>c.id), [retained.id]);
+          assert.deepEqual((await read(directory)).items.map(c=>c.id), [retained.id]);
+          for (const path of [directory+'?classId='+target.id,rosterPath,targetPath+'/candidates'])
+            await request(teaching(path), {auth,status:404});
+          await patch(teaching(targetPath), auth, {name:'Stale rename',expectedRevision:revision},404);
+          await post(teaching(rosterPath), auth, {identityId:pupil.id},404);
+          await remove(teaching(rosterPath+'/'+pupil.id), auth,404);
+          await post(teaching(api+'identity-imports/preview'), auth,input,404);
+          await post(teaching(api+'identity-imports/commit'), auth,{...input,previewToken:preview.previewToken},404);
+          const audience = await read(api+'activities/options');
+          assert.deepEqual(audience.classes.map(c=>c.id), [retained.id]);
+          assert.ok(!audience.students.some(i=>i.id===pupil.id));
+          await post(teaching(api+'activities'), auth, {requestId:randomUUID(),kind:'assignment',title:'Stale audience',
+            problems:[],classIds:[target.id],identityIds:[pupil.id]},403);
+          assert.ok((await request(rosterPath, {auth})).data.items.some(i=>i.id===pupil.id));
+          await remove(rosterPath+'/'+pupil.id, auth);
+          await remove(directory+'/'+retained.id+'/roster/'+dossier.id, campusAdmin);
+        }
+      });
     } finally {
       await app?.close();
       await pool.end();

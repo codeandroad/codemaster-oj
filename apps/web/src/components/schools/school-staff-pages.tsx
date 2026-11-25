@@ -15,7 +15,6 @@ import { type School, useSchoolText } from "./school-ui";
 
 export function SchoolStaffImports({ school, teacher }: { school: School; teacher: boolean }) {
   const text = useSchoolText();
-  const canManageAllClasses = school.roles.includes("school_admin");
   const [target, setTarget] = useState<{ id: string; name: string; type?: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
@@ -27,9 +26,7 @@ export function SchoolStaffImports({ school, teacher }: { school: School; teache
           <h2 className="text-lg font-bold">{teacher ? text("Student roster import", "学生名单导入") : text("Identity import", "身份导入")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {teacher
-              ? canManageAllClasses
-                ? text("Select a school class, then preview a CSV or Excel roster before importing.", "选择本校班级，预览 CSV 或 Excel 名单后再导入。")
-                : text("Select a class you teach, then preview a CSV or Excel roster before importing.", "选择负责的班级，预览 CSV 或 Excel 名单后再导入。")
+              ? text("Select a class you teach, then preview a CSV or Excel roster before importing.", "选择负责的班级，预览 CSV 或 Excel 名单后再导入。")
               : text("Preview student or teacher identity records from a CSV or Excel file before importing them into this school.", "预览 CSV 或 Excel 中的学生、教师身份档案后，导入本校。")}
           </p>
         </div>

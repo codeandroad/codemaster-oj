@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolClassApiPath } from "./school-workspace-location";
 import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ export function SchoolActivityEditor({ schoolId, kind, activity, onSaved, onCanc
 }) {
   const text = useSchoolText();
   const base = `schools/${schoolId}/activities`;
-  const options = useData<ActivityOptions>(`${base}/options`);
+  const options = useData<ActivityOptions>(schoolClassApiPath(`${base}/options`));
   const storedRule = useData<ActivityRule>(activity ? `schools/${schoolId}/scholarship/activity-rule?activityId=${activity.id}` : "");
   const [editedRule, setEditedRule] = useState<ActivityRule | null>(null);
   const originalRule = storedRule.data;
@@ -67,7 +68,7 @@ export function SchoolActivityEditor({ schoolId, kind, activity, onSaved, onCanc
         ...(JSON.stringify(editedRule.assistance) !== JSON.stringify((originalRule ?? newAssignmentRule).assistance)
           && { assistance: editedRule.assistance }),
       };
-      const value = await productionApi<SchoolActivity>(`${base}${activity ? `/${activity.id}` : ""}`, { method: activity ? "PATCH" : "POST", body: {
+      const value = await productionApi<SchoolActivity>(schoolClassApiPath(`${base}${activity ? `/${activity.id}` : ""}`), { method: activity ? "PATCH" : "POST", body: {
         kind, title, description, startsAt: activityDateValue(startsAt), endsAt: activityDateValue(endsAt), durationMinutes: duration,
         problems: selected.map(({ problemId, versionId, points }) => ({ problemId, versionId, points })), identityIds: students, classIds: classes,
         ...(scholarshipRule && { scholarshipRule }),

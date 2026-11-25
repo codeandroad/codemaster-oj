@@ -14,6 +14,11 @@ export function schoolWorkspaceRole(
   return roles.includes("teacher") ? "teacher" : "student";
 }
 
+/** Class and roster requests from teaching tools must use the assigned-teacher scope. */
+export function schoolClassApiPath(path: string, teaching = true) {
+  return teaching ? path + (path.includes("?") ? "&" : "?") + "schoolRole=teacher" : path;
+}
+
 export function schoolWorkspaceHref(schoolId: string, section = "home", role?: SchoolWorkspaceRole) {
   const params = new URLSearchParams({ schoolId, section });
   if (role === "teacher") params.set("schoolRole", "teacher");

@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolClassApiPath } from "./school-workspace-location";
 import { useRef, useState, type FormEvent } from "react";
 import {
   Feedback,
@@ -63,7 +64,7 @@ export function SchoolClassEditor({
       .run(async () => {
         try {
           const saved = await productionApi<SchoolClassRecord>(
-            `schools/${school.id}/classes${item ? `/${item.id}` : ""}`,
+            schoolClassApiPath(`schools/${school.id}/classes${item ? `/${item.id}` : ""}`, renameOnly),
             {
               method: item ? "PATCH" : "POST",
               body: {
@@ -193,12 +194,14 @@ type Candidate = {
 };
 export function SchoolClassRosterPicker({
   school,
+  teaching,
   item,
   kind,
   onClose,
   onSaved,
 }: {
   school: School;
+  teaching: boolean;
   item: SchoolClassRecord;
   kind: "student" | "teacher";
   onClose: () => void;
@@ -219,7 +222,7 @@ export function SchoolClassRosterPicker({
     lock.current = true;
     await action.run(async () => {
       try {
-        await productionApi(`schools/${school.id}/classes/${item.id}/roster`, {
+        await productionApi(schoolClassApiPath(`schools/${school.id}/classes/${item.id}/roster`, teaching), {
           method: "POST",
           body: { identityId: selected.id, ...(kind === "teacher" && {permissions}) },
         });
@@ -274,7 +277,7 @@ export function SchoolClassRosterPicker({
         </form>
         <CandidateRows
           key={`${kind}:${query}:${page}:${unassigned}`}
-          path={`schools/${school.id}/classes/${item.id}/candidates?${new URLSearchParams({ kind, q: query, page: String(page), unassigned: String(unassigned) })}`}
+          path={schoolClassApiPath(`schools/${school.id}/classes/${item.id}/candidates?${new URLSearchParams({ kind, q: query, page: String(page), unassigned: String(unassigned) })}`, teaching)}
           selected={selected}
           onSelect={setSelected}
           disabled={action.busy}
@@ -419,12 +422,14 @@ function CandidateRows({
 
 export function SchoolClassAction({
   school,
+  teaching,
   item,
   action: requestedAction,
   onClose,
   onSaved,
 }: {
   school: School;
+  teaching: boolean;
   item: SchoolClassRecord;
   action: "archive" | "restore" | { id: string; name: string; kind: string };
   onClose: () => void;
@@ -448,7 +453,7 @@ export function SchoolClassAction({
       try {
         const base = `schools/${school.id}/classes/${item.id}`;
         await productionApi(
-          roster ? `${base}/roster/${roster.id}` : `${base}/${requestedAction}`,
+          schoolClassApiPath(roster ? `${base}/roster/${roster.id}` : `${base}/${requestedAction}`, teaching),
           roster
             ? { method: "DELETE" }
             : { method: "POST", body: { expectedRevision: item.revision } },

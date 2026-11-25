@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolClassApiPath } from "./school-workspace-location";
 import { useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import {
@@ -182,7 +183,7 @@ export function SchoolIdentityImport({
         classId: selectedClass?.id ?? null,
       };
       const data = await productionApi<ImportPreview>(
-        `${base}/identity-imports/preview`,
+        schoolClassApiPath(`${base}/identity-imports/preview`, studentClassOnly),
         {
           method: "POST",
           body,
@@ -228,7 +229,7 @@ export function SchoolIdentityImport({
     setError("");
     try {
       const result = await productionApi<ImportResult>(
-        `${base}/identity-imports/commit`,
+        schoolClassApiPath(`${base}/identity-imports/commit`, studentClassOnly),
         {
           method: "POST",
           body: { ...preview.body, previewToken: preview.data.previewToken },
@@ -709,7 +710,7 @@ function ImportClassPage({
 }) {
   const text = useSchoolText();
   const resource = useData<{ items: ClassChoice[]; hasMore: boolean }>(
-    `${base}/classes?page=${page}&limit=50`,
+    schoolClassApiPath(`${base}/classes?page=${page}&limit=50`, required),
   );
   const items = resource.data?.items ?? [];
   const choices =

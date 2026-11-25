@@ -1,5 +1,6 @@
 "use client";
 
+import { schoolClassApiPath } from "./school-workspace-location";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -68,7 +69,7 @@ export function SchoolClasses({
     router.push(schoolClassHref(searchParams, school.id, change), { scroll: false });
   return (
     <SchoolClassList
-      key={`${school.id}:${activeId}:${archived}:${page}:${revision}:${refreshRevision}`}
+      key={`${school.id}:${management}:${activeId}:${archived}:${page}:${revision}:${refreshRevision}`}
       school={school}
       management={management}
       kind={kind}
@@ -115,7 +116,7 @@ function SchoolClassList({
   const router = useRouter();
   const base = `schools/${school.id}`;
   const resource = useData<ClassPage>(
-    `${base}/classes?archived=${archived}&page=${page}${activeId ? `&classId=${encodeURIComponent(activeId)}` : ""}`,
+    schoolClassApiPath(`${base}/classes?archived=${archived}&page=${page}${activeId ? `&classId=${encodeURIComponent(activeId)}` : ""}`, !management),
   );
   useEffect(() => {
     if (!resource.data || resource.error || !activeId) return;
@@ -128,7 +129,24 @@ function SchoolClassList({
   const staff =
     school.roles.includes("teacher") || school.roles.includes("school_admin");
   const admin = management && school.roles.includes("school_admin");
-  const choices = useData<{items:{id:string;name:string}[]}>(`${base}/classes?view=choices&archived=${archived}`);
+  const choices = useData<{items:{id:string;name:string}[]}>(schoolClassApiPath(`${base}/classes?view=choices&archived=${archived}`, !management));
+  const reloadClasses = resource.reload;
+  const reloadChoices = choices.reload;
+  useEffect(() => {
+    if (management) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        reloadClasses();
+        reloadChoices();
+      }
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [management, reloadClasses, reloadChoices]);
   const current = activeId
     ? resource.data?.items.find((item) => item.id === activeId)
     : resource.data?.items[0];
@@ -196,8 +214,8 @@ function SchoolClassList({
           aria-label={text("Search roster by name or ID","搜索名单中的姓名或编号")} placeholder={text("Search roster by name or ID","搜索名单中的姓名或编号")}
           onChange={event=>onQuery(event.target.value)} />
         <select aria-label={text("Select class","选择班级")} name="classId" className={inputClass+" !w-auto max-w-full"}
-          value={current?.id ?? activeId} disabled={!choices.data?.items.length} onChange={event=>onSelect(event.target.value)}>
-          {!current && !activeId && <option value="">{text("Select class","选择班级")}</option>}
+          value={current?.id ?? ""} disabled={!choices.data?.items.length} onChange={event=>onSelect(event.target.value)}>
+          {!current && <option value="">{text("Select class","选择班级")}</option>}
           {choices.data?.items.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </search>
@@ -228,7 +246,7 @@ function SchoolClassList({
           )}
         </div>
       </Loading>
-      {editing && (
+      {editing && (admin || (editing !== "new" && current?.canRename && current.id === editing.id)) && (
         <SchoolClassEditor
           school={school}
           renameOnly={!admin}
@@ -237,7 +255,7 @@ function SchoolClassList({
           onSaved={(id) => onRefresh(id, editing === "new")}
         />
       )}
-      {importing && current && (
+      {importing && current?.canManageStudents && (
         <SchoolIdentityImport
           school={school}
           initialClass={current}
@@ -375,18 +393,20 @@ function SchoolClassRoster({
         onRemove={setAction}
       />
       {editingTeacher && <TeacherPermissionsEditor school={school} item={item} teacher={editingTeacher} onClose={()=>setEditingTeacher(null)} onSaved={onRefresh}/>}
-      {adding && (
+      {adding && item.canManageStudents && (
         <SchoolClassRosterPicker
           school={school}
+          teaching={!admin}
           item={item}
           kind={adding}
           onClose={() => setAdding(null)}
           onSaved={()=>{onKind(adding);onRefresh();}}
         />
       )}
-      {action && (
+      {action && (admin || item.canManageStudents) && (
         <SchoolClassAction
           school={school}
+          teaching={!admin}
           item={item}
           action={action}
           onClose={() => setAction(null)}
@@ -420,7 +440,7 @@ function SchoolClassRosterRows({
 }) {
   const text = useSchoolText();
   const resource = useData<RosterPage>(
-    `schools/${school.id}/classes/${item.id}/roster?kind=${kind}&page=${page}&q=${encodeURIComponent(query)}`,
+    schoolClassApiPath(`schools/${school.id}/classes/${item.id}/roster?kind=${kind}&page=${page}&q=${encodeURIComponent(query)}`, staff && !admin),
   );
   const manageable =
     !item.archived && (admin || (item.canManageStudents && kind === "student"));

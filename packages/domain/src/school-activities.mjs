@@ -1,7 +1,7 @@
 import { addAssignmentFeedback, assignmentCompletionCounts, assignmentCourses, assignmentHasRuns, assignmentMetadata, assignmentSubmissions, orderAssignmentProblems, recordedParticipants } from './school-assignment-authoring.mjs';
 import { assignmentCatalogOptions, prepareAssignmentEdition } from './catalog-problem-publication.mjs';
 import { lockPlatformContent } from './platform-content-access.mjs';
-import { teachingClasses } from './school-teaching.mjs';
+import { classWorkspaceRole, teachingClasses } from './school-teaching.mjs';
 import { readableClassCourse, schoolPublishedProblemOptions } from './school-courses.mjs';
 import { assignmentChange, notifySchoolAssignmentChange } from './assignment-changes.mjs';
 import { schoolAssignmentReceiptGrades } from './assignment-grades.mjs';
@@ -471,6 +471,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     // Match membership/roster mutation lock ordering; a revoke cannot race publication or submit.
     await lockSchoolTeaching(db, schoolId, { shared: method === 'GET' });
     const role = await schoolRole(db, schoolId, user.id);
+    const audienceRole = classWorkspaceRole(role, url);
     await scope(db, schoolId);
     if (preview) {
       const { a } = await load(db, schoolId, uuid(preview[2]), user, role, { management: true });
@@ -479,7 +480,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     const staff = role === 'school_admin' || role === 'teacher';
     if (match[2] === 'options' && method === 'GET') {
       if (!staff) fail(403, 'FORBIDDEN', 'Teaching role required.');
-      return reply(await options(db, schoolId,user,role,url.searchParams.get('view')==='assignment'));
+      return reply(await options(db, schoolId,user,audienceRole,url.searchParams.get('view')==='assignment'));
     }
     if (!match[2] && method === 'GET') {
       const kind = enumValue(url.searchParams.get('kind') ?? 'assignment', ['assignment', 'timed'], 'Activity type');
@@ -525,7 +526,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       const a = (await db.query(`INSERT INTO school_activities(school_id,owner_account_id,kind,title,description,starts_at,ends_at,duration_minutes,request_id,request_hash)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, [schoolId, user.id, kind, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes, requestId, hash])).rows[0];
       const courseId=editor ? await assignmentMetadata(db,a,user,body) : null;
-      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role,courseId});
+      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role:audienceRole,courseId});
       await storeSelections(db,schoolId,a.id,data);
       if (rule !== undefined) await saveDraftRule(db, schoolId, user, role, a.id, rule);
       await auditSchool(db, schoolId, user.id, 'school.activity.create', a.id);
@@ -557,7 +558,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       const data = normalize(body, a.kind);
       const editor=a.kind==='assignment' && body.audienceMode==='selected';
       const courseId=editor ? await assignmentMetadata(db,a,user,body) : a.platform_course_id;
-      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role,courseId});
+      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role:audienceRole,courseId});
       await db.query(`UPDATE school_activities SET title=$3,description=$4,starts_at=$5,ends_at=$6,duration_minutes=$7,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2`, [schoolId, a.id, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes]);
       const previous = await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2', [schoolId, a.id]);
       await storeSelections(db, schoolId, a.id, data, previous.rows);
@@ -578,7 +579,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         if (await assignmentHasRuns(db,a)) fail(409,'ACTIVITY_FROZEN','Problems with submission history are fixed.');
         const next=normalize({...body,title,description},'assignment');
         if (!next.problems.length) fail(400,'VALIDATION','Select at least one problem.');
-        await validateSelections(db,schoolId,{problems:next.problems,classIds:[],identityIds:[]},{expandClasses:false,user,role,courseId});
+        await validateSelections(db,schoolId,{problems:next.problems,classIds:[],identityIds:[]},{expandClasses:false,user,role:audienceRole,courseId});
         const previous=await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id]);
         await replaceProblemSelections(db,schoolId,a.id,next.problems,previous.rows);
       }
@@ -586,7 +587,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (body.identityIds!==undefined) {
         const students=ids(body.identityIds,'Students'),classes=ids(body.classIds??[],'Classes',100);
         if (!students.length || due && +new Date(due)<=Date.now()) fail(400,'VALIDATION','Select students before the deadline.');
-        await validateSelections(db,schoolId,{problems:[],identityIds:students,classIds:classes},{expandClasses:false,user,role,publishedActivityId:a.id});
+        await validateSelections(db,schoolId,{problems:[],identityIds:students,classIds:classes},{expandClasses:false,user,role:audienceRole,publishedActivityId:a.id});
         const old=(await db.query('SELECT identity_id,exempt FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id])).rows;
         const protectedIds=await recordedParticipants(db,a);
         if (old.some(p=>p.exempt ? students.includes(p.identity_id) : protectedIds.includes(p.identity_id) && !students.includes(p.identity_id)))
@@ -613,7 +614,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (a.kind==='assignment' && (a.school_course_id||a.platform_course_id)) await assignmentMetadata(db,a,user,{});
       const data = await detail(db, loaded, user);
       if (a.kind === 'timed' && (!a.starts_at || !a.ends_at || !a.duration_minutes)) fail(400, 'VALIDATION', 'Set an opening time, closing time and duration before publishing timed practice.');
-      await validateSelections(db, schoolId, { problems: data.problems.map(p => ({ problemId: p.id, versionId: p.versionId })), identityIds: data.identityIds, classIds: data.classIds },{expandClasses:false,user,role,courseId:a.platform_course_id});
+      await validateSelections(db, schoolId, { problems: data.problems.map(p => ({ problemId: p.id, versionId: p.versionId })), identityIds: data.identityIds, classIds: data.classIds },{expandClasses:false,user,role:audienceRole,courseId:a.platform_course_id});
       if (!data.problems.length || !data.participantCount) fail(400, 'VALIDATION', 'Select at least one problem and student before publishing.');
       if (a.ends_at && +new Date(a.ends_at) <= Date.now()) fail(400, 'VALIDATION', 'The closing time must be in the future.');
       await db.query("UPDATE school_activities SET state='Published',published_at=clock_timestamp(),revision=revision+1 WHERE school_id=$1 AND id=$2", [schoolId, a.id]);

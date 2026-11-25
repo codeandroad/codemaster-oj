@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
-import { requireSchoolClassManagement } from './school-teaching.mjs';
+import { classWorkspaceRole, requireSchoolClassManagement } from './school-teaching.mjs';
 import { canonicalHash, fail, safeEqual, tokenHash, uuid } from './security.mjs';
 
 const MAX_ROWS = 500;
@@ -143,13 +143,13 @@ async function buildPlan(db, schoolId, input) {
   return { items, summary, hash, operations, classExists: !input.classId || Boolean(schoolClass) };
 }
 
-export async function handleSchoolIdentityImports({ pool, config, user, route, method, body }) {
+export async function handleSchoolIdentityImports({ pool, config, user, route, method, body, url }) {
   const match = route.match(/^\/schools\/([^/]+)\/identity-imports\/(preview|commit)$/);
   if (!match || method !== 'POST') return null;
   const schoolId = uuid(match[1], '学校 ID').toLowerCase();
   return transaction(pool, async db => {
     await lockSchoolTeaching(db, schoolId, { shared: match[2] === 'preview' });
-    const role = await schoolRole(db, schoolId, user.id);
+    const role = classWorkspaceRole(await schoolRole(db, schoolId, user.id), url);
     if (role !== 'school_admin' && role !== 'teacher') fail(403, 'FORBIDDEN', '需要本校教职权限');
     const input = normalizeRequest(body);
     if (role === 'teacher' && (input.kind !== 'student' || !input.classId)) {

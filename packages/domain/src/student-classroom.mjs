@@ -54,7 +54,7 @@ export async function studentClassroom(db, schoolId, classId, user, membersOnly)
     WHERE school_id=$1 AND scope='school' AND deleted_at IS NULL AND coalesce(course_id,platform_course_id)=ANY($2::uuid[])
     ORDER BY updated_at DESC,id`, [schoolId,[...courses.keys()]]);
   return {id:group.id,name:group.name,description:group.description,memberCount:students.length,members,
-    teachers:rows.filter(r=>r.kind==='teacher').map(r=>({name:r.name})),assignments,paper4Activities:[],
+    teachers:rows.filter(r=>r.kind==='teacher' || r.kind==='school_admin').map(r=>({name:r.name})),assignments,paper4Activities:[],
     courses:[...courses.values()].map(({id,title,description,scope})=>({id,title,description,scope})),
     resources:resources.filter(r=>!r.chapterId || courses.get(r.pathId).chapters.some(ch=>ch.id===r.chapterId))};
 }

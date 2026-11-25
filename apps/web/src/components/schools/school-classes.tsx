@@ -2,12 +2,11 @@
 
 import { schoolClassApiPath } from "./school-workspace-location";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Upload, UserPlus } from "lucide-react";
 import { inputClass, Loading, panelClass, useData } from "@/components/admin/common";
 import { Table } from "@/components/teacher/shared";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { SchoolIdentityImport } from "./school-identity-import";
 import {
   SchoolClassEditor,
@@ -179,14 +178,6 @@ function SchoolClassList({
             >
               {text("Archived", "已归档")}
             </Button>
-          )}
-          {management && (
-            <Link
-              className={buttonVariants({ size: "sm", variant: "secondary" })}
-              href={`/schools?schoolId=${school.id}&section=courses`}
-            >
-              {text("Courses", "课程")}
-            </Link>
           )}
         </div>
         {staff && (

@@ -42,13 +42,13 @@ export const workspaceNavigation = {
     { section: "home", path: "/admin", label: "管理员首页", shortEnglish: "Dashboard", icon: Home },
     { section: "members", path: "/admin/accounts", label: "账号与角色", shortEnglish: "Accounts", icon: Users },
     { section: "identities", path: "/admin/people", label: "身份档案", shortEnglish: "Identities", icon: UserRound },
-    { section: "imports", path: "/admin/imports", label: "导入中心", shortEnglish: "Imports", icon: Database },
     { section: "problems", path: "/admin/problem-banks", label: "题库管理", shortEnglish: "Problem banks", icon: BookOpenCheck },
     { section: "exam-preparation", path: "/admin/exam-preparation", label: "备考资源", shortEnglish: "Exam resources", icon: GraduationCap },
     { section: "course-admissions", path: "/admin/course-admissions", label: "课程申请", shortEnglish: "Course applications", icon: ClipboardList },
     { section: "judge", path: "/admin/judge-service", label: "判题服务", icon: Gauge },
     { section: "system-settings", path: "/admin/settings", label: "系统设置", icon: Settings },
     { section: "scholarship", path: "/admin/scholarship", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
+    { section: "imports", path: "/admin/imports", label: "导入中心", shortEnglish: "Imports", icon: Database },
   ],
 } as const satisfies Record<string, readonly WorkspaceNavigationItem[]>;
 

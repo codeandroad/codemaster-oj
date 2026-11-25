@@ -32,7 +32,7 @@ export function AdminDashboard({ schoolId }: { schoolId?: string }) {
         description={t("维护学校身份与账号，查看导入、判题服务和系统设置。")}
       />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        {workspaceNavigation.admin.slice(1, 4).map(item => (
+        {workspaceNavigation.admin.filter(item => ["members", "identities", "imports"].includes(item.section)).map(item => (
           <AppLink
             key={item.path}
             href={schoolId ? schoolWorkspaceHref(schoolId, item.section) : item.path}

@@ -39,7 +39,7 @@ export function LearnerResourceScope({ section, schoolHref, workspaceSchoolId, c
     {!search.has("problemId") && <nav aria-label={text("Learning scope", "学习范围")} className="flex flex-wrap gap-1 border-b border-border">
       {[
         { href: section === "problems" ? scopeHref + "school" : schoolHref, active: !showPublic, label: text("My school", "本校") },
-        { href: publicHref, active: showPublic, label: section === "problems" || section === "courses" ? text("Open Platform", "开放平台") : text("Platform public", "平台公开") },
+        { href: publicHref, active: showPublic, label: text("Open Platform", "开放平台") },
       ].map(tab => <AppLink key={tab.href} href={tab.href} aria-current={tab.active ? "page" : undefined}
         className={`border-b-2 px-4 py-2 text-sm font-semibold ${tab.active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
         {tab.label}

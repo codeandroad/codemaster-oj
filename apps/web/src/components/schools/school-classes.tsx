@@ -180,12 +180,14 @@ function SchoolClassList({
               {text("Archived", "已归档")}
             </Button>
           )}
-          <Link
-            className={buttonVariants({ size: "sm", variant: "secondary" })}
-            href={`/schools?schoolId=${school.id}&section=courses`}
-          >
-            {text("Courses", "课程")}
-          </Link>
+          {management && (
+            <Link
+              className={buttonVariants({ size: "sm", variant: "secondary" })}
+              href={`/schools?schoolId=${school.id}&section=courses`}
+            >
+              {text("Courses", "课程")}
+            </Link>
+          )}
         </div>
         {staff && (
           <div className="flex min-w-0 max-w-full flex-wrap gap-2">

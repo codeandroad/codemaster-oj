@@ -204,11 +204,28 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await remove(`${roster(alpha, otherClass)}/${alphaStudent.id}`, teacher, 404);
       await remove(`${roster(alpha, taughtClass)}/${betaStudent.id}`, alphaAdmin, 404);
 
-      // A linked teacher can create their own class and only manage its students.
-      const { data: ownedClass } = await post(classes(alpha), teacher, { name: 'Teacher-created class', type: 'training' });
+      // The administrator assigns the same teacher to multiple classes independently.
+      await post(classes(alpha), teacher, {name:'Teacher-created class',type:'training'},403);
+      const {data:ownedClass} = await post(classes(alpha),alphaAdmin,{name:'Second teaching class',type:'training'});
+      const permissionsPath = roster(alpha,ownedClass)+'/'+alphaTeacher.id;
+      const grant = {permissions:{canRename:true,canManageStudents:false}};
+      await post(roster(alpha,ownedClass),alphaAdmin,{identityId:alphaTeacher.id,...grant});
+      await patch(permissionsPath,teacher,{permissions:{canRename:true,canManageStudents:true}},403);
+      await request(roster(alpha,ownedClass),{auth:teacher});
+      await request(classes(alpha)+'/'+ownedClass.id+'/candidates',{auth:teacher,status:403});
+      await post(roster(alpha,ownedClass),teacher,{identityId:alphaStudent.id},403);
+      await remove(roster(alpha,ownedClass)+'/'+alphaStudent.id,teacher,403);
+      const previewPath=schoolPath(alpha,'identity-imports/preview');
+      await post(previewPath,teacher,{kind:'student',classId:ownedClass.id,rows:[{number:'XX',name:'Test'}]},403);
+      await post(roster(alpha,ownedClass),alphaAdmin,{identityId:alphaTeacher.id,permissions:{canRename:false,canManageStudents:true}},409);
+      const teaching = (await request(classes(alpha),{auth:teacher})).data.items;
+      assert.deepEqual(teaching.map(c=>[c.id,c.canRename,c.canManageStudents]).sort(),
+        [[ownedClass.id,true,false],[taughtClass.id,false,true]].sort());
+      await patch(classes(alpha)+'/'+taughtClass.id,teacher,{name:'No grant',expectedRevision:1},403);
+      await patch(permissionsPath,alphaAdmin,{permissions:{canRename:true,canManageStudents:true}});
       assert.equal(ownedClass.revision, 1);
       assert.equal(ownedClass.archived, false);
-      assert.equal((await request(classes(alpha), { auth: teacher })).data.canCreate, true);
+      assert.equal((await request(classes(alpha), { auth: teacher })).data.canCreate, false);
       assert.deepEqual((await request(roster(alpha, ownedClass), { auth: teacher })).data.items.map(i => i.id), [alphaTeacher.id]);
       const candidates = (cls, suffix = '') => `${classes(alpha)}/${cls.id}/candidates${suffix}`;
       assert.deepEqual((await request(candidates(ownedClass), { auth: teacher })).data.items.map(i => i.id), [alphaStudent.id]);
@@ -234,16 +251,17 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await patch(classResource(otherClass), teacher, { name: 'Not mine', type: 'training', expectedRevision: 1 }, 404);
       await patch(classResource(ownedClass), student, { name: 'Not authorized', type: 'training', expectedRevision: 1 }, 403);
       await patch(classResource(ownedClass), teacher, { name: 'Missing revision', type: 'training' }, 400);
+      await patch(classResource(ownedClass), teacher, {name:'Change type',type:'administrative',expectedRevision:1},403);
       const updates = await Promise.all([
-        patch(classResource(ownedClass), teacher, { name: 'Concurrent name A', type: 'administrative', expectedRevision: 1 }, [200, 409]),
-        patch(classResource(ownedClass), alphaAdmin, { name: 'Concurrent name B', type: 'administrative', expectedRevision: 1 }, [200, 409]),
+        patch(classResource(ownedClass), teacher, { name: 'Concurrent name A', type: 'training', expectedRevision: 1 }, [200, 409]),
+        patch(classResource(ownedClass), alphaAdmin, { name: 'Concurrent name B', type: 'training', expectedRevision: 1 }, [200, 409]),
       ]);
       assert.equal(updates.filter(result => !result.data.error).length, 1, 'exactly one stale-version update wins');
       const updatedClass = updates.find(result => !result.data.error).data;
       assert.equal(updatedClass.revision, 2);
-      assert.equal(updatedClass.type, 'administrative');
-      await post(`${classResource(ownedClass)}/archive`, teacher, { expectedRevision: 1 }, 409);
-      const { data: archivedClass } = await post(`${classResource(ownedClass)}/archive`, teacher, { expectedRevision: 2 }, 200);
+      assert.equal(updatedClass.type, 'training');
+      await post(`${classResource(ownedClass)}/archive`, teacher, { expectedRevision: 2 }, 403);
+      const { data: archivedClass } = await post(`${classResource(ownedClass)}/archive`, alphaAdmin, { expectedRevision: 2 }, 200);
       assert.equal(archivedClass.revision, 3);
       assert.equal(archivedClass.archived, true);
       assert.ok(!(await request(classes(alpha), { auth: teacher })).data.items.some(c => c.id === ownedClass.id));
@@ -254,7 +272,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await post(roster(alpha, ownedClass), teacher, { identityId: alphaStudent.id }, 409);
       await patch(classResource(ownedClass), teacher, { name: 'Cannot edit archive', type: 'training', expectedRevision: 3 }, 409);
       await request(candidates(ownedClass), { auth: teacher, status: 409 });
-      const { data: restoredClass } = await post(`${classResource(ownedClass)}/restore`, teacher, { expectedRevision: 3 }, 200);
+      const { data: restoredClass } = await post(`${classResource(ownedClass)}/restore`, alphaAdmin, { expectedRevision: 3 }, 200);
       assert.equal(restoredClass.archived, false);
       assert.equal(restoredClass.revision, 4);
       assert.equal(restoredClass.name, updatedClass.name);
@@ -362,7 +380,27 @@ test('school directories and class rosters enforce tenant, role, and account bou
       });
       assert.equal((await pool.query('SELECT 1 FROM school_class_roster WHERE identity_id=$1', [unassigned.id])).rowCount, 0);
 
+      await t.test('a teacher can find and enroll an unassigned school student, without changing other rosters',async()=>{
+        const available = await request(candidates(taughtClass,'?kind=student&unassigned=true&q=NO-CLASS'),{auth:teacher});
+        assert.deepEqual(available.data.items.map(i=>i.id),[unassigned.id]);
+        await post(roster(alpha,taughtClass),teacher,{identityId:unassigned.id});
+        assert.equal((await request(candidates(taughtClass,'?unassigned=true&q=NO-CLASS'),{auth:teacher})).data.items.length,0);
+        assert.deepEqual((await request(roster(alpha,taughtClass)+'?q=NO-CLASS',{auth:teacher})).data.items.map(i=>i.id),[unassigned.id]);
+        await remove(roster(alpha,taughtClass)+'/'+unassigned.id,teacher);
+        const choices=(await request(classes(alpha)+'?view=choices',{auth:teacher})).data.items;
+        assert.ok(choices.length>50 && choices.some(c=>c.id===locatedId) && !choices.some(c=>c.id===otherClass.id));
+      });
       const classPath = person => `${identities(alpha)}/${person.id}/classes`;
+      await t.test('dual-role staff appear under each role with their identity represented once',async()=>{
+        const rolesPath=schoolPath(alpha,'accounts/'+teacher.id+'/roles');
+        const change=(from,to)=>patch(rolesPath,alphaAdmin,{role:'teacher',expectedRole:'teacher',administrator:to,expectedAdministrator:from});
+        await change(false,true);
+        for (const role of ['teacher','school_admin']) {
+          const {data}=await request(identities(alpha)+'?kind='+role+'&q=Alpha%20Instructor',{auth:alphaAdmin});
+          assert.deepEqual(data.items.map(i=>[i.id,i.roles]),[[alphaTeacher.id,['school_admin','teacher']]]);
+        }
+        await change(true,false);
+      });
       await t.test('directory filters, detail drawers and recoverable deletions use stable school identities',async()=>{
         const api=identities(alpha);
         const get=async path=>(await request(path,{auth:alphaAdmin})).data;
@@ -575,7 +613,8 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await post('/classes', alphaAdmin, { name: 'Unscoped class creation' }, 410);
       assert.deepEqual((await request('/classes', { auth: campusAdmin })).data.items, []);
       assert.equal((await pool.query('SELECT count(*)::int count FROM identities')).rows[0].count, 5);
-      assert.equal((await pool.query("SELECT count(*)::int count FROM audit_events WHERE action LIKE 'school.%'")).rows[0].count, 0);
+      assert.deepEqual((await pool.query("SELECT action,resource_id AS id FROM audit_events WHERE action LIKE 'school.%'")).rows,
+        Array.from({length:2},()=>({action:'school.account.roles',id:teacher.id})));
       const { rows: audit } = await pool.query(`
         SELECT action, count(*)::int count FROM school_audit_events
         WHERE school_id = $1 AND target_id = $2 GROUP BY action`, [alpha.id, alphaTeacher.id]);
@@ -585,6 +624,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
         'school.identity.unlink': 2,
         'school.roster.add': 4,
         'school.roster.remove': 3,
+        'school.roster.teacher_permissions': 2,
       });
       const { rows: [studentAudit] } = await pool.query(`
         SELECT count(*)::int count FROM school_audit_events

@@ -9,12 +9,19 @@ import { canonicalHash, enumValue, fail, field, genderValue, integer, uuid } fro
 
 const PAGE_SIZE = 50;
 const IDENTITY_KINDS = ['student', 'teacher'];
-const assignedTeacher = `EXISTS (
-  SELECT 1 FROM school_class_roster r
+const teacherRoster = `FROM school_class_roster r
   JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
   WHERE r.school_id = c.school_id AND r.class_id = c.id
-    AND i.kind = 'teacher' AND i.account_id = $2
-)`;
+    AND i.kind = 'teacher' AND i.account_id = $2 AND i.archived_at IS NULL`;
+const assignedTeacher = `EXISTS (SELECT 1 ${teacherRoster})`;
+const teacherPermissions = `coalesce((SELECT r.can_rename ${teacherRoster}),false) AS "canRename",
+  coalesce((SELECT r.can_manage_students ${teacherRoster}),false) AS "canManageStudents"`;
+
+export async function teachingClasses(db, schoolId, accountId, role, archived = false) {
+  return (await db.query(`SELECT c.id,c.name FROM school_classes c WHERE c.school_id=$1
+    AND ($2::uuid IS NULL OR ${assignedTeacher}) AND (c.archived_at IS NOT NULL)=$3 ORDER BY c.name,c.id`,
+    [schoolId, role === 'school_admin' ? null : accountId, archived])).rows;
+}
 
 function pageResult(page, rows) {
   return { status: 200, body: { items: rows.slice(0, PAGE_SIZE), page, hasMore: rows.length > PAGE_SIZE } };
@@ -50,7 +57,9 @@ const archivedByExit = `EXISTS (SELECT 1 FROM school_exit_requests e WHERE e.sch
 const canArchiveIdentity = `i.kind IN ('student','teacher') AND i.account_id IS NULL
   AND NOT i.has_account_history
   AND NOT (${archivedByExit})`;
-const directoryFields = `i.id,i.kind,i.number,i.name,i.gender,i.account_id AS "accountId",i.created_at AS "createdAt",
+const directoryRoles = `ARRAY(SELECT i.kind UNION SELECT role FROM school_workspace_roles wr
+  WHERE wr.school_id=i.school_id AND wr.account_id=i.account_id ORDER BY 1)`;
+const directoryFields = `i.id,i.kind,${directoryRoles} AS roles,i.number,i.name,i.gender,i.account_id AS "accountId",i.created_at AS "createdAt",
   (SELECT username FROM accounts a WHERE a.id=i.account_id) AS username,${identityClasses},
   i.archived_at AS "archivedAt",(${canArchiveIdentity}) AS "canArchive",${archivedByExit} AS "archivedByExit"`;
 
@@ -59,7 +68,7 @@ async function listIdentities(db, schoolId, url) {
   const archived=params.get('archived')==='true';
   if (params.get('view')==='filters') {
     const classes=(await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id',[schoolId])).rows;
-    const counts=(await db.query('SELECT kind,count(*)::int n FROM school_identities WHERE school_id=$1 AND (archived_at IS NOT NULL)=$2 GROUP BY kind',[schoolId,archived])).rows;
+    const counts=(await db.query(`SELECT role AS kind,count(*)::int n FROM school_identities i CROSS JOIN LATERAL unnest(${directoryRoles}) roles(role) WHERE i.school_id=$1 AND (i.archived_at IS NOT NULL)=$2 GROUP BY role`,[schoolId,archived])).rows;
     return {status:200,body:{classes,counts:Object.fromEntries(counts.map(row=>[row.kind,row.n]))}};
   }
   const page = requestedPage(url);
@@ -70,7 +79,7 @@ async function listIdentities(db, schoolId, url) {
   const query = field(params.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
   const { rows } = await db.query(`
     SELECT ${directoryFields} FROM school_identities i
-    WHERE i.school_id=$1 AND (i.archived_at IS NOT NULL)=$7 AND ($2::text IS NULL OR i.kind=$2)
+    WHERE i.school_id=$1 AND (i.archived_at IS NOT NULL)=$7 AND ($2::text IS NULL OR $2=ANY(${directoryRoles}))
       AND ($3='' OR strpos(lower(i.name),lower($3))>0 OR strpos(lower(i.number),lower($3))>0
         OR EXISTS(SELECT 1 FROM accounts a WHERE a.id=i.account_id AND strpos(lower(a.username),lower($3))>0))
       AND (NOT $6 OR (i.account_id IS NULL AND i.archived_at IS NULL AND i.kind IN ('student','teacher')))
@@ -193,21 +202,17 @@ const assignedStudent = `EXISTS (
 const classProjection = `c.id, c.name, c.description, c.type, c.created_at AS "createdAt",
   c.archived_at IS NOT NULL AS archived, c.revision`;
 
-async function teacherIdentity(db, schoolId, accountId) {
-  return (await db.query(`SELECT id FROM school_identities
-    WHERE school_id = $1 AND account_id = $2 AND kind = 'teacher'`, [schoolId, accountId])).rows[0];
-}
-
 // Callers hold the school teaching advisory lock for the whole read/write.
 // Never accept a client-provided role: role comes from schoolRole in this transaction.
-export async function requireSchoolClassManagement(db, schoolId, accountId, role, classId, { allowArchived = false } = {}) {
+export async function requireSchoolClassManagement(db, schoolId, accountId, role, classId, { allowArchived = false, manageStudents = false } = {}) {
   if (role !== 'school_admin' && role !== 'teacher') fail(403, 'FORBIDDEN', '需要本校教职权限');
   const { rows: [schoolClass] } = await db.query(`
-    SELECT ${classProjection} FROM school_classes c
+    SELECT ${classProjection}, ${teacherPermissions} FROM school_classes c
     WHERE c.school_id = $1 AND c.id = $3 AND ($2::uuid IS NULL OR ${assignedTeacher})`,
   [schoolId, role === 'teacher' ? accountId : null, classId]);
   if (!schoolClass) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
   if (!allowArchived && schoolClass.archived) fail(409, 'CLASS_ARCHIVED', '请先恢复已归档班级');
+  if (manageStudents && role === 'teacher' && !schoolClass.canManageStudents) fail(403, 'FORBIDDEN', '未获授权管理本班学生名单');
   return schoolClass;
 }
 
@@ -215,6 +220,9 @@ async function listClasses(db, schoolId, actorId, role, url) {
   let page = requestedPage(url);
   let archived = url.searchParams.get('archived') === 'true' && role !== 'student';
   const access = role === 'school_admin' ? 'true' : role === 'teacher' ? assignedTeacher : assignedStudent;
+  if (url.searchParams.get('view') === 'choices' && role !== 'student') {
+    return {status:200,body:{items:await teachingClasses(db, schoolId, actorId, role, archived)}};
+  }
   if (url.searchParams.has('classId')) {
     const classId = uuid(url.searchParams.get('classId'), '班级 ID');
     // Locate only within the caller's authorized directory. An inaccessible ID
@@ -231,7 +239,7 @@ async function listClasses(db, schoolId, actorId, role, url) {
     archived = located.archived;
   }
   const { rows } = await db.query(`
-    SELECT ${classProjection},
+    SELECT ${classProjection}, ${teacherPermissions},
       (SELECT count(*)::int FROM school_class_roster r JOIN school_identities i
         ON i.school_id = r.school_id AND i.id = r.identity_id
         WHERE r.school_id = c.school_id AND r.class_id = c.id AND i.kind = 'student' AND i.archived_at IS NULL) AS "studentCount",
@@ -242,36 +250,33 @@ async function listClasses(db, schoolId, actorId, role, url) {
     WHERE c.school_id = $1 AND $2::uuid IS NOT NULL AND ${access} AND (c.archived_at IS NOT NULL) = $3
     ORDER BY c.name, c.id LIMIT $4 OFFSET $5`,
   [schoolId, actorId, archived, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE]);
-  const result = pageResult(page, rows.map(row => ({ ...row, canManage: role !== 'student' })));
+  const result = pageResult(page, rows.map(row => ({ ...row, canManage: role !== 'student',
+    canRename: role === 'school_admin' || row.canRename, canManageStudents: role === 'school_admin' || row.canManageStudents })));
   result.body.archived = archived;
-  result.body.canCreate = role === 'school_admin' || (role === 'teacher' && Boolean(await teacherIdentity(db, schoolId, actorId)));
+  result.body.canCreate = role === 'school_admin';
   return result;
 }
 
 async function createClass(db, schoolId, actorId, role, body) {
-  if (role !== 'school_admin' && role !== 'teacher') fail(403, 'FORBIDDEN', '需要本校教职权限');
-  const teacher = role === 'teacher' ? await teacherIdentity(db, schoolId, actorId) : null;
-  if (role === 'teacher' && !teacher) fail(403, 'TEACHER_IDENTITY_REQUIRED', '请先由学校管理员关联教师身份档案');
+  if (role !== 'school_admin') fail(403, 'FORBIDDEN', '仅学校管理员可创建班级');
   const name = field(body.name, '班级名称', { max: 100 });
   const type = enumValue(body.type, ['administrative', 'training'], '班级类型');
   const { rows: [schoolClass] } = await db.query(`
     INSERT INTO school_classes (school_id, name, type) VALUES ($1, $2, $3)
     RETURNING id, name, type, created_at AS "createdAt", archived_at IS NOT NULL AS archived, revision`, [schoolId, name, type]);
-  if (teacher) {
-    await db.query('INSERT INTO school_class_roster (school_id, class_id, identity_id) VALUES ($1, $2, $3)',
-      [schoolId, schoolClass.id, teacher.id]);
-    await auditSchool(db, schoolId, actorId, 'school.roster.add', teacher.id);
-  }
   await auditSchool(db, schoolId, actorId, 'school.class.create', schoolClass.id);
   return { status: 201, body: schoolClass };
 }
 
 async function updateClass(db, schoolId, actorId, role, classId, action, body) {
   const current = await requireSchoolClassManagement(db, schoolId, actorId, role, classId, { allowArchived: action !== 'edit' });
+  if (role === 'teacher' && (action !== 'edit' || !current.canRename || (body.type !== undefined && body.type !== current.type))) {
+    fail(403, 'FORBIDDEN', '当前操作需要班级管理授权');
+  }
   const expectedRevision = integer(body.expectedRevision, 1, 2147483647, '班级版本');
   if (current.revision !== expectedRevision) fail(409, 'CONFLICT', '班级信息已变化，请刷新后重试');
   const name = action === 'edit' ? field(body.name, '班级名称', { max: 100 }) : current.name;
-  const type = action === 'edit' ? enumValue(body.type, ['administrative', 'training'], '班级类型') : current.type;
+  const type = action === 'edit' ? enumValue(body.type ?? current.type, ['administrative', 'training'], '班级类型') : current.type;
   const archived = action === 'archive' || (action === 'edit' && current.archived);
   if (current.name === name && current.type === type && current.archived === archived) return { status: 200, body: current };
   const { rows: [updated] } = await db.query(`UPDATE school_classes SET name = $3, type = $4,
@@ -293,8 +298,9 @@ async function listRoster(db, schoolId, actorId, role, classId, url) {
   } else {
     await requireSchoolClassManagement(db, schoolId, actorId, role, classId, { allowArchived: true });
   }
+  const query = field(url.searchParams.get('q') ?? '', '搜索关键词', {min:0,max:100});
   const staffFields = role === 'student' ? '' : `, i.number, r.added_at AS "addedAt",
-    i.account_id IS NOT NULL AS "accountLinked",
+    i.account_id IS NOT NULL AS "accountLinked", r.can_rename AS "canRename", r.can_manage_students AS "canManageStudents",
     CASE WHEN i.account_id IS NULL THEN 'unlinked'
       WHEN a.disabled_at IS NOT NULL OR a.binding_released_at IS NOT NULL THEN 'disabled' ELSE 'active' END AS "accountStatus"`;
   const { rows } = await db.query(`SELECT i.id, i.kind, i.name ${staffFields}
@@ -302,12 +308,13 @@ async function listRoster(db, schoolId, actorId, role, classId, url) {
     JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
     LEFT JOIN accounts a ON a.id = i.account_id
     WHERE r.school_id = $1 AND r.class_id = $2 AND i.archived_at IS NULL AND ($3::text IS NULL OR i.kind = $3)
-    ORDER BY i.name, i.id LIMIT $4 OFFSET $5`, [schoolId, classId, kind, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE]);
+    AND ($6='' OR strpos(lower(i.name),lower($6))>0 ${role === 'student' ? '' : "OR strpos(lower(i.number),lower($6))>0"})
+    ORDER BY i.name, i.id LIMIT $4 OFFSET $5`, [schoolId, classId, kind, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE,query]);
   return pageResult(page, rows);
 }
 
 async function listCandidates(db, schoolId, actorId, role, classId, url) {
-  await requireSchoolClassManagement(db, schoolId, actorId, role, classId);
+  await requireSchoolClassManagement(db, schoolId, actorId, role, classId, {manageStudents:true});
   const kind = requestedKind(url) ?? 'student';
   if (role === 'teacher' && kind !== 'student') fail(403, 'FORBIDDEN', '教师只能管理学生名单');
   const query = field(url.searchParams.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
@@ -316,8 +323,10 @@ async function listCandidates(db, schoolId, actorId, role, classId, url) {
     FROM school_identities i WHERE i.school_id = $1 AND i.kind = $3 AND i.archived_at IS NULL
       AND NOT EXISTS (SELECT 1 FROM school_class_roster r
         WHERE r.school_id = i.school_id AND r.class_id = $2 AND r.identity_id = i.id)
+      AND (NOT $7 OR NOT EXISTS (SELECT 1 FROM school_class_roster other JOIN school_classes active
+        ON (active.school_id,active.id)=(other.school_id,other.class_id) WHERE other.school_id=i.school_id AND other.identity_id=i.id AND active.archived_at IS NULL))
       AND ($4 = '' OR strpos(lower(i.name), lower($4)) > 0 OR strpos(lower(i.number), lower($4)) > 0)
-    ORDER BY i.name, i.id LIMIT $5 OFFSET $6`, [schoolId, classId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE]);
+    ORDER BY i.name, i.id LIMIT $5 OFFSET $6`, [schoolId, classId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE,url.searchParams.get('unassigned') === 'true']);
   return pageResult(page, rows);
 }
 
@@ -325,17 +334,42 @@ async function requireRosterIdentity(db, schoolId, role, identityId) {
   const { rows: [identity] } = await db.query('SELECT kind FROM school_identities WHERE school_id = $1 AND id = $2 AND archived_at IS NULL', [schoolId, identityId]);
   if (!identity) fail(404, 'NOT_FOUND', '本校身份档案不存在');
   if (role === 'teacher' && identity.kind !== 'student') fail(403, 'FORBIDDEN', '教师只能管理学生名单');
+  return identity.kind;
 }
 
-async function addRosterIdentity(db, schoolId, actorId, role, classId, identityId) {
-  await requireSchoolClassManagement(db, schoolId, actorId, role, classId);
-  await requireRosterIdentity(db, schoolId, role, identityId);
-  await addToClassRosters(db, schoolId, actorId, identityId, [classId]);
+async function addRosterIdentity(db, schoolId, actorId, role, classId, identityId, body) {
+  await requireSchoolClassManagement(db, schoolId, actorId, role, classId, {manageStudents:true});
+  const kind = await requireRosterIdentity(db, schoolId, role, identityId);
+  if (body.permissions !== undefined && kind !== 'teacher') fail(400,'VALIDATION','仅任课教师可设置班级权限');
+  const added = await addToClassRosters(db, schoolId, actorId, identityId, [classId]);
+  if (body.permissions !== undefined) {
+    await saveTeacherPermissions(db,schoolId,actorId,classId,identityId,body.permissions,
+      added ? undefined : body.permissions);
+  }
   return { status: 201, body: { ok: true } };
 }
 
+async function saveTeacherPermissions(db, schoolId, actorId, classId, identityId, permissions, expected) {
+  if (typeof permissions?.canRename !== 'boolean' || typeof permissions?.canManageStudents !== 'boolean')
+    fail(400,'VALIDATION','请选择班级管理权限');
+  const {rows:[current]} = await db.query(`SELECT r.can_rename AS "canRename",r.can_manage_students AS "canManageStudents"
+    FROM school_class_roster r JOIN school_identities i ON (i.school_id,i.id)=(r.school_id,r.identity_id)
+    WHERE r.school_id=$1 AND r.class_id=$2 AND r.identity_id=$3 AND i.kind='teacher' AND i.archived_at IS NULL`,
+    [schoolId,classId,identityId]);
+  if (!current) fail(404,'NOT_FOUND','班级中没有该教师');
+  const matches = value => value?.canRename === current.canRename && value?.canManageStudents === current.canManageStudents;
+  if (!matches(permissions)) {
+    if (expected !== undefined && !matches(expected)) fail(409,'CONFLICT','班级权限已变化，请刷新后重试');
+    await db.query(`UPDATE school_class_roster SET can_rename=$4,can_manage_students=$5
+      WHERE school_id=$1 AND class_id=$2 AND identity_id=$3`,
+      [schoolId,classId,identityId,permissions.canRename,permissions.canManageStudents]);
+    await auditSchool(db,schoolId,actorId,'school.roster.teacher_permissions',identityId);
+  }
+  return {status:200,body:{ok:true}};
+}
+
 async function removeRosterIdentity(db, schoolId, actorId, role, classId, identityId) {
-  await requireSchoolClassManagement(db, schoolId, actorId, role, classId);
+  await requireSchoolClassManagement(db, schoolId, actorId, role, classId, {manageStudents:true});
   await requireRosterIdentity(db, schoolId, role, identityId);
   const rowCount = await removeFromClassRosters(db, schoolId, actorId, identityId, [classId]);
   if (!rowCount) fail(404, 'NOT_FOUND', '班级名单中未找到该身份档案');
@@ -393,7 +427,12 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
     if (classId && !rosterIdentity) {
       if (method === 'PATCH' && !action) return updateClass(db, schoolId, user.id, role, classId, 'edit', body);
       if (method === 'POST' && ['archive', 'restore'].includes(action)) return updateClass(db, schoolId, user.id, role, classId, action, body);
-      if (method === 'POST' && action === 'roster') return addRosterIdentity(db, schoolId, user.id, role, classId, uuid(body.identityId, '身份档案 ID'));
+      if (method === 'POST' && action === 'roster') return addRosterIdentity(db, schoolId, user.id, role, classId, uuid(body.identityId, '身份档案 ID'), body);
+    }
+    if (method === 'PATCH' && action === 'roster' && rosterIdentity) {
+      if (role !== 'school_admin') fail(403,'FORBIDDEN','仅学校管理员可分配教师权限');
+      await requireSchoolClassManagement(db,schoolId,user.id,role,classId);
+      return saveTeacherPermissions(db,schoolId,user.id,classId,uuid(rosterIdentity),body.permissions,body.expectedPermissions);
     }
     if (method === 'DELETE' && action === 'roster' && rosterIdentity) {
       return removeRosterIdentity(db, schoolId, user.id, role, classId, uuid(rosterIdentity, '身份档案 ID'));

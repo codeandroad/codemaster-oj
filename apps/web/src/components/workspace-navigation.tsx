@@ -41,6 +41,7 @@ export const workspaceNavigation = {
   admin: [
     { section: "home", path: "/admin", label: "管理员首页", shortEnglish: "Dashboard", icon: Home },
     { section: "members", path: "/admin/accounts", label: "账号与角色", shortEnglish: "Accounts", icon: Users },
+    { section: "classes", path: "/admin/classes", label: "班级管理", shortEnglish: "Classes", icon: Users },
     { section: "identities", path: "/admin/people", label: "身份档案", shortEnglish: "Identities", icon: UserRound },
     { section: "problems", path: "/admin/problem-banks", label: "题库管理", shortEnglish: "Problem banks", icon: BookOpenCheck },
     { section: "exam-preparation", path: "/admin/exam-preparation", label: "备考资源", shortEnglish: "Exam resources", icon: GraduationCap },

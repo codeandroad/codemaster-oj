@@ -26,7 +26,7 @@ import {
 } from "./school-identity-import-parser";
 
 type IdentityKind = "student" | "teacher";
-type ClassChoice = { id: string; name: string; type?: string };
+type ClassChoice = { id: string; name: string; type?: string; canManageStudents?:boolean };
 type ImportStatus =
   | "create"
   | "existing"
@@ -734,7 +734,7 @@ function ImportClassPage({
             {required ? text("Select a class", "请选择班级") : text("No class — identities only", "不选班级，仅建立身份")}
           </option>
           {choices.map((item) => (
-            <option key={item.id} value={item.id}>
+            <option key={item.id} value={item.id} disabled={item.canManageStudents === false}>
               {item.name} ·{" "}
               {item.type === "training"
                 ? text("Training", "训练班")

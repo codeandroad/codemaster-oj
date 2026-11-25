@@ -77,6 +77,7 @@ export class SchoolsController {
   @Patch([
     'schools/:schoolId/identities/:identityId/profile',
     'schools/:schoolId/identities/:identityId/classes',
+    'schools/:schoolId/classes/:classId/roster/:identityId',
     'schools/:schoolId/accounts/:accountId/roles',
     'schools/:schoolId/accounts/:accountId/access',
     'schools/:schoolId/problem-groups/:id','schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/classes/:classId', 'schools/:schoolId/identities/:identityId/account', 'schools/:schoolId/courses/:courseId', 'schools/:schoolId/courses/:courseId/admission-settings'])

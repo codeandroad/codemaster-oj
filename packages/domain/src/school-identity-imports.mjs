@@ -157,7 +157,7 @@ export async function handleSchoolIdentityImports({ pool, config, user, route, m
     }
     const hash = requestHash(input);
     if (match[2] === 'preview') {
-      if (input.classId) await requireSchoolClassManagement(db, schoolId, user.id, role, input.classId);
+      if (input.classId) await requireSchoolClassManagement(db, schoolId, user.id, role, input.classId, {manageStudents:true});
       const plan = await buildPlan(db, schoolId, input);
       if (!plan.classExists) fail(404, 'NOT_FOUND', '本校班级不存在');
       const canCommit = plan.summary.errors === 0;
@@ -174,7 +174,7 @@ export async function handleSchoolIdentityImports({ pool, config, user, route, m
 
     const claims = readPreviewToken(body.previewToken, config.secret, user.id, schoolId, hash);
     const schoolClass = input.classId
-      ? await requireSchoolClassManagement(db, schoolId, user.id, role, input.classId, { allowArchived: true }) : null;
+      ? await requireSchoolClassManagement(db, schoolId, user.id, role, input.classId, { allowArchived: true, manageStudents:true }) : null;
     const { rows: [receipt] } = await db.query(`
       SELECT request_hash, preview_token_hash, aggregate_result FROM school_identity_imports
       WHERE school_id = $1 AND actor_account_id = $2 AND preview_nonce = $3`, [schoolId, user.id, claims.nonce]);

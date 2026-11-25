@@ -331,6 +331,7 @@ export function SchoolsPage({
                   search.get("profileId") ? <StudentPublicProfile profileId={search.get("profileId")!} schoolId={selected.id} viewer={user} workspace={admin?"admin":teaching?"teacher":"student"} /> : <SchoolLeaderboard schoolId={selected.id} />
                 ) : active.section === "classes" ? (
                   <SchoolClasses
+                    management={admin}
                     school={selected}
                     refreshRevision={refreshRevision}
                   />

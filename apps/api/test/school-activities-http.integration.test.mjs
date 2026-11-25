@@ -48,6 +48,29 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     };
     const auth = {}; for (const name of Object.keys(users)) { const login = await request('/auth/login', { method: 'POST', body: { username: name, password } }); auth[name] = { cookie: login.cookie, csrfToken: login.data.csrfToken }; }
     const prefix = '/schools/' + school.id, activities = prefix + '/activities';
+    const classroom = (await request(prefix+'/classes',{auth:auth.admin,method:'POST',status:201,body:{name:'Assigned class',type:'training'}})).data;
+    for(const identityId of [ids.teacher,ids.student,ids.peer,ids.fresh])
+      await request(prefix+'/classes/'+classroom.id+'/roster',{auth:auth.admin,method:'POST',status:201,body:{identityId}});
+    await t.test('assignment audience follows current teaching assignments even when roster management is delegated separately',async()=>{
+      const adminPost = {auth:auth.admin,method:'POST',status:201};
+      const other=(await request(prefix+'/classes',{...adminPost,body:{name:'Other class',type:'training'}})).data;
+      const outsider=(await request(prefix+'/identities',{...adminPost,body:{kind:'student',number:'UNASSIGNED',name:'Unassigned'}})).data;
+      const options=(await request(activities+'/options?view=assignment',{auth:auth.teacher})).data;
+      assert.deepEqual(options.classes.map(c=>c.id),[classroom.id]);
+      assert.ok(!options.students.some(s=>s.id===outsider.id));
+      const body={kind:'assignment',title:'Scoped audience',problems:[],identityIds:[outsider.id],requestId:randomUUID()};
+      const send=(changes,status)=>request(activities,{method:'POST',auth:auth.teacher,status,body:{...body,...changes,requestId:randomUUID()}});
+      await send({},403); await send({identityIds:[],classIds:[other.id]},403);
+      await request(prefix+'/classes/'+classroom.id+'/roster',{method:'POST',auth:auth.teacher,status:201,body:{identityId:outsider.id}});
+      const grantPath=prefix+'/classes/'+classroom.id+'/roster/'+ids.teacher;
+      const permissions = canManageStudents => ({permissions:{canRename:false,canManageStudents}});
+      await request(grantPath,{method:'PATCH',auth:auth.admin,body:permissions(false)});
+      await send({},201);
+      await request(prefix+'/classes/'+classroom.id+'/roster/'+outsider.id,{method:'DELETE',auth:auth.teacher,status:403});
+      await request(grantPath,{method:'PATCH',auth:auth.admin,body:permissions(true)});
+      await request(prefix+'/classes/'+classroom.id+'/roster/'+outsider.id,{method:'DELETE',auth:auth.teacher});
+      await send({},403);
+    });
     await t.test('new-school grants notify only the intended student in the school inbox', async () => {
       const inbox = prefix + '/student-notifications';
       const grant = { identityIds: [ids.student], amount: 15, reason: 'Class award', requestId: randomUUID() };
@@ -459,7 +482,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     await t.test('school assignment editor keeps an exact roster, authorized course, marks, award and feedback', async () => {
       const staff = {auth:auth.teacher}, post = {...staff,method:'POST'}, patch = {...staff,method:'PATCH'};
       const {rows:[group]} = await pool.query("INSERT INTO school_classes(school_id,name) VALUES($1,'Editor class') RETURNING id",[school.id]);
-      await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)',[school.id,group.id,ids.fresh,ids.peer]);
+      await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3),($1,$2,$4),($1,$2,$5)',[school.id,group.id,ids.fresh,ids.peer,ids.teacher]);
       const {rows:[course]} = await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,platform_audience_scope,published_at,required_language)
         VALUES($1,'Authorized assignment course','platform','custom',now(),'python') RETURNING id`,[users.admin.id]);
       const selector=activities+'/options?view=assignment';

@@ -249,6 +249,10 @@ test('platform courses retain original data and enforce audiences through NestJS
   });
   await t.test('a school teacher assigns the actual platform exercise from the granted Python training course',async t=>{
    assert.equal(first.p.title,'Python 专项训练 · 全目录学习路线');
+   const classes='/schools/'+LEGACY_SCHOOL_ID+'/classes';
+   const assigned=await school.send(classes,{name:'Granted course class',type:'training'},'POST',201);
+   for(const key of ['school-teacher','student-a','student-b'])
+    await school.send(classes+'/'+assigned.id+'/roster',{identityId:actors[key].identityId},'POST',201);
    const path=`/schools/${LEGACY_SCHOOL_ID}/activities`,options=path+'/options?view=assignment';
    const grantPath=`/platform/content-editors/course/${first.p.id}`;
    const grant={accountId:actors['school-teacher'].id,schoolId:LEGACY_SCHOOL_ID};

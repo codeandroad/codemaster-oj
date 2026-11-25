@@ -22,7 +22,7 @@ async function requireActiveClasses(db, schoolId, classes) {
 }
 
 export async function addToClassRosters(db, schoolId, actorId, identityId, classIds) {
-  await db.query(`WITH added AS (
+  const {rowCount} = await db.query(`WITH added AS (
     INSERT INTO school_class_roster (school_id, class_id, identity_id)
     SELECT $1, class_id, $3 FROM unnest($4::uuid[]) AS classes(class_id)
     ON CONFLICT (school_id, class_id, identity_id) DO NOTHING
@@ -30,6 +30,7 @@ export async function addToClassRosters(db, schoolId, actorId, identityId, class
   )
   INSERT INTO school_audit_events (school_id, actor_account_id, action, target_id)
   SELECT school_id, $2, 'school.roster.add', identity_id FROM added`, [schoolId, actorId, identityId, classIds]);
+  return rowCount;
 }
 
 export async function removeFromClassRosters(db, schoolId, actorId, identityId, classIds) {

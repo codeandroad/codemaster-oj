@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Upload, UserPlus } from "lucide-react";
-import { Loading, panelClass, useData } from "@/components/admin/common";
+import { inputClass, Loading, panelClass, useData } from "@/components/admin/common";
 import { Table } from "@/components/teacher/shared";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SchoolIdentityImport } from "./school-identity-import";
@@ -12,6 +12,7 @@ import {
   SchoolClassEditor,
   SchoolClassRosterPicker,
   SchoolClassAction,
+  TeacherPermissionsEditor,
 } from "./school-class-dialogs";
 import { useSchoolText, type School } from "./school-ui";
 import { schoolClassHref, schoolClassLocation } from "./school-class-location";
@@ -25,6 +26,8 @@ export type SchoolClassRecord = {
   studentCount: number;
   teachers: { id: string; name: string }[];
   canManage: boolean;
+  canRename: boolean;
+  canManageStudents: boolean;
 };
 type ClassPage = {
   items: SchoolClassRecord[];
@@ -38,23 +41,28 @@ type RosterIdentity = {
   name: string;
   kind: "student" | "teacher";
   number?: string;
+  canRename: boolean;
+  canManageStudents: boolean;
   accountLinked?: boolean;
   accountStatus?: "active" | "disabled" | "unlinked";
 };
+type RosterKind = "student" | "teacher";
 type RosterPage = { items: RosterIdentity[]; page: number; hasMore: boolean };
 
-// Matches the existing teacher Classes workspace: class cards stay visible while
-// its selected roster changes. Authorization remains in the school API.
 export function SchoolClasses({
   school,
   refreshRevision = 0,
+  management = true,
 }: {
   school: School;
   refreshRevision?: number;
+  management?: boolean;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { archived, page, classId: activeId } = schoolClassLocation(searchParams);
+  const [query,setQuery] = useState("");
+  const [kind,setKind] = useState<RosterKind>("student");
   const [revision, setRevision] = useState(0);
   const navigate = (change: Parameters<typeof schoolClassHref>[2]) =>
     router.push(schoolClassHref(searchParams, school.id, change), { scroll: false });
@@ -62,9 +70,13 @@ export function SchoolClasses({
     <SchoolClassList
       key={`${school.id}:${activeId}:${archived}:${page}:${revision}:${refreshRevision}`}
       school={school}
+      management={management}
+      kind={kind}
+      onKind={setKind}
+      query={query}
+      onQuery={setQuery}
       archived={archived}
       page={page}
-      onPage={(value) => navigate({ page: value, classId: "" })}
       activeId={activeId}
       onSelect={(id) => navigate({ classId: id })}
       onFilter={(value) => {
@@ -82,7 +94,7 @@ function SchoolClassList({
   school,
   archived,
   page,
-  onPage,
+  management, query, onQuery, kind, onKind,
   activeId,
   onSelect,
   onFilter,
@@ -91,7 +103,8 @@ function SchoolClassList({
   school: School;
   archived: boolean;
   page: number;
-  onPage: (page: number) => void;
+  kind: RosterKind; onKind: (kind:RosterKind)=>void;
+  management: boolean; query: string; onQuery: (value:string)=>void;
   activeId: string;
   onSelect: (id: string) => void;
   onFilter: (archived: boolean) => void;
@@ -114,7 +127,8 @@ function SchoolClassList({
   }, [resource.data, resource.error, activeId, page, archived, router, searchParams, school.id]);
   const staff =
     school.roles.includes("teacher") || school.roles.includes("school_admin");
-  const admin = school.roles.includes("school_admin");
+  const admin = management && school.roles.includes("school_admin");
+  const choices = useData<{items:{id:string;name:string}[]}>(`${base}/classes?view=choices&archived=${archived}`);
   const current = activeId
     ? resource.data?.items.find((item) => item.id === activeId)
     : resource.data?.items[0];
@@ -157,18 +171,18 @@ function SchoolClassList({
         </div>
         {staff && (
           <div className="flex min-w-0 max-w-full flex-wrap gap-2">
-            <Button
+            {admin && <Button
               size="sm"
               disabled={!resource.data?.canCreate}
               onClick={() => setEditing("new")}
             >
               <Plus size={15} />
               {text("New class", "新建班级")}
-            </Button>
+            </Button>}
             <Button
               size="sm"
               variant="secondary"
-              disabled={!current?.canManage || current.archived}
+              disabled={!current?.canManageStudents || current.archived}
               onClick={() => setImporting(true)}
             >
               <Upload size={15} />
@@ -177,70 +191,27 @@ function SchoolClassList({
           </div>
         )}
       </div>
-      {staff && !admin && resource.data && !resource.data.canCreate && (
-        <p className="text-sm text-muted-foreground">
-          {text(
-            "Ask your school administrator to link your teacher identity before creating a class.",
-            "请先联系学校管理员关联你的教师档案，再新建班级。",
-          )}
-        </p>
-      )}
+      <search className="flex flex-wrap items-center gap-2" aria-label={text("Class roster filters","班级名单筛选")}>
+        <input type="search" name="rosterSearch" value={query} maxLength={100} className={inputClass+" min-w-40 flex-1"}
+          aria-label={text("Search roster by name or ID","搜索名单中的姓名或编号")} placeholder={text("Search roster by name or ID","搜索名单中的姓名或编号")}
+          onChange={event=>onQuery(event.target.value)} />
+        <select aria-label={text("Select class","选择班级")} name="classId" className={inputClass+" !w-auto max-w-full"}
+          value={current?.id ?? activeId} disabled={!choices.data?.items.length} onChange={event=>onSelect(event.target.value)}>
+          {!current && !activeId && <option value="">{text("Select class","选择班级")}</option>}
+          {choices.data?.items.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </search>
+      {choices.error && <Loading resource={choices}>{null}</Loading>}
       <Loading resource={resource}>
-        <div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <aside
-            className="space-y-3"
-            aria-label={text("Class list", "班级列表")}
-          >
-            {resource.data?.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelect(item.id)}
-                aria-pressed={item.id === current?.id}
-                className={`block w-full border p-4 text-left panel-shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${item.id === current?.id ? "border-primary bg-info-soft" : "border-border bg-surface hover:border-primary/50"}`}
-              >
-                <span className="block break-words font-bold">{item.name}</span>
-                <span className="mt-1 block text-sm text-muted-foreground">
-                  {item.studentCount} {text("students", "名学生")} ·{" "}
-                  {item.type === "administrative"
-                    ? text("Administrative class", "行政班")
-                    : text("Training class", "训练班")}
-                </span>
-              </button>
-            ))}
-            {!resource.data?.items.length && (
-              <p className={`${panelClass} p-5 text-sm text-muted-foreground`}>
-                {archived
-                  ? text("No archived classes.", "暂无已归档班级。")
-                  : admin
-                    ? text(
-                        "No classes yet. Create a class to get started.",
-                        "暂无班级，请先新建班级。",
-                      )
-                    : staff
-                      ? text(
-                          "No classes are assigned to you yet.",
-                          "你还没有负责的班级。",
-                        )
-                      : text(
-                          "You have not been added to a class yet.",
-                          "你还没有加入班级。",
-                        )}
-              </p>
-            )}
-            {(page > 1 || resource.data?.hasMore) && (
-              <ClassPagination
-                page={page}
-                hasMore={Boolean(resource.data?.hasMore)}
-                onPage={onPage}
-              />
-            )}
-          </aside>
+        <div className="min-w-0">
           {current ? (
             <SchoolClassRoster
               key={current.id}
               school={school}
               item={current}
+              kind={kind}
+              onKind={onKind}
+              query={query.trim()}
               staff={staff}
               admin={admin}
               onEdit={() => setEditing(current)}
@@ -250,10 +221,9 @@ function SchoolClassList({
             <section
               className={`${panelClass} p-6 text-sm text-muted-foreground`}
             >
-              {text(
-                activeId ? "This class is not available in your school workspace." : "Select a class to view its student roster.",
-                activeId ? "当前学校工作区无法访问此班级。" : "选择班级后查看学生名单。",
-              )}
+              {archived ? text("No archived classes.","暂无已归档班级。") : admin
+                ? text("No classes yet. Create a class to get started.","暂无班级，请先新建班级。")
+                : text("No classes assigned. Contact your school administrator.","尚未分配班级，请联系学校管理员。")}
             </section>
           )}
         </div>
@@ -261,6 +231,7 @@ function SchoolClassList({
       {editing && (
         <SchoolClassEditor
           school={school}
+          renameOnly={!admin}
           item={editing === "new" ? undefined : editing}
           onClose={() => setEditing(null)}
           onSaved={(id) => onRefresh(id, editing === "new")}
@@ -281,7 +252,7 @@ function SchoolClassList({
 
 function SchoolClassRoster({
   school,
-  item,
+  item, query, kind, onKind,
   staff,
   admin,
   onEdit,
@@ -289,14 +260,19 @@ function SchoolClassRoster({
 }: {
   school: School;
   item: SchoolClassRecord;
+  query: string;
+  kind:RosterKind;
+  onKind:(kind:RosterKind)=>void;
   staff: boolean;
   admin: boolean;
   onEdit: () => void;
   onRefresh: () => void;
 }) {
   const text = useSchoolText();
-  const [kind, setKind] = useState<"student" | "teacher">("student");
-  const [page, setPage] = useState(1);
+  const [cursor,setCursor] = useState({query, page:1});
+  const page = cursor.query === query ? cursor.page : 1;
+  const setPage = (page:number)=>setCursor({query,page});
+  const [editingTeacher,setEditingTeacher] = useState<RosterIdentity | null>(null);
   const [adding, setAdding] = useState<"student" | "teacher" | null>(null);
   const [action, setAction] = useState<
     "archive" | "restore" | RosterIdentity | null
@@ -306,10 +282,10 @@ function SchoolClassRoster({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h2 className="break-words font-bold">
-            {item.name} · {text("Student roster", "学生名单")}
+            {item.name} · {kind === "teacher" ? text("Teacher roster","教师名单") : text("Student roster", "学生名单")}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {item.studentCount} {text("students", "名学生")}
+            {item.type === "administrative" ? text("Administrative class","行政班") : text("Training class","训练班")} · {item.studentCount} {text("students", "名学生")}
             {item.teachers.length > 0 && (
               <>
                 {" "}
@@ -321,12 +297,12 @@ function SchoolClassRoster({
         </div>
         {item.canManage && (
           <div className="flex flex-wrap gap-2">
-            {!item.archived && (
+            {!item.archived && item.canRename && (
               <Button size="sm" variant="secondary" onClick={onEdit}>
-                {text("Edit class", "编辑班级")}
+                {admin ? text("Edit class", "编辑班级") : text("Rename class","修改班级名称")}
               </Button>
             )}
-            <Button
+            {admin && <Button
               size="sm"
               variant="secondary"
               onClick={() => setAction(item.archived ? "restore" : "archive")}
@@ -334,7 +310,7 @@ function SchoolClassRoster({
               {item.archived
                 ? text("Restore class", "恢复班级")
                 : text("Archive class", "归档班级")}
-            </Button>
+            </Button>}
           </div>
         )}
       </div>
@@ -352,7 +328,7 @@ function SchoolClassRoster({
                 variant={kind === value ? "secondary" : "ghost"}
                 aria-pressed={kind === value}
                 onClick={() => {
-                  setKind(value);
+                  onKind(value);
                   setPage(1);
                 }}
               >
@@ -362,7 +338,7 @@ function SchoolClassRoster({
               </Button>
             ))}
           </div>
-          {item.canManage && !item.archived && (
+          {item.canManageStudents && !item.archived && (
             <div className="flex flex-wrap gap-2">
               {admin && (
                 <Button
@@ -394,15 +370,18 @@ function SchoolClassRoster({
         onPage={setPage}
         staff={staff}
         admin={admin}
+        query={query}
+        onEditTeacher={setEditingTeacher}
         onRemove={setAction}
       />
+      {editingTeacher && <TeacherPermissionsEditor school={school} item={item} teacher={editingTeacher} onClose={()=>setEditingTeacher(null)} onSaved={onRefresh}/>}
       {adding && (
         <SchoolClassRosterPicker
           school={school}
           item={item}
           kind={adding}
           onClose={() => setAdding(null)}
-          onSaved={onRefresh}
+          onSaved={()=>{onKind(adding);onRefresh();}}
         />
       )}
       {action && (
@@ -426,7 +405,7 @@ function SchoolClassRosterRows({
   onPage,
   staff,
   admin,
-  onRemove,
+  onRemove, query, onEditTeacher,
 }: {
   school: School;
   item: SchoolClassRecord;
@@ -436,13 +415,15 @@ function SchoolClassRosterRows({
   staff: boolean;
   admin: boolean;
   onRemove: (identity: RosterIdentity) => void;
+  query:string;
+  onEditTeacher:(teacher:RosterIdentity)=>void;
 }) {
   const text = useSchoolText();
   const resource = useData<RosterPage>(
-    `schools/${school.id}/classes/${item.id}/roster?kind=${kind}&page=${page}`,
+    `schools/${school.id}/classes/${item.id}/roster?kind=${kind}&page=${page}&q=${encodeURIComponent(query)}`,
   );
   const manageable =
-    item.canManage && !item.archived && (admin || kind === "student");
+    !item.archived && (admin || (item.canManageStudents && kind === "student"));
   return (
     <div className="min-h-40">
       <Loading resource={resource}>
@@ -485,7 +466,9 @@ function SchoolClassRosterRows({
                 </td>
               )}
               {manageable && (
-                <td>
+                <td><div className="flex flex-wrap gap-1">
+                  {admin && kind==="teacher" && <Button size="sm" variant="secondary" onClick={()=>onEditTeacher(identity)}>
+                    {text("Class permissions","班级权限")}</Button>}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -496,7 +479,7 @@ function SchoolClassRosterRows({
                     onClick={() => onRemove(identity)}
                   >
                     {text("Remove", "移出")}
-                  </Button>
+                  </Button></div>
                 </td>
               )}
             </tr>
@@ -507,7 +490,7 @@ function SchoolClassRosterRows({
                 colSpan={staff ? (manageable ? 4 : 3) : 1}
                 className="py-8 text-center text-muted-foreground"
               >
-                {kind === "teacher"
+                {query ? text("No matching roster entries.","没有匹配的名单记录。") : kind === "teacher"
                   ? text("No teachers assigned.", "尚未分配教师。")
                   : text("This class has no students yet.", "该班级暂无学生。")}
               </td>

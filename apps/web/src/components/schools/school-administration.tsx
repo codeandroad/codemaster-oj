@@ -47,7 +47,7 @@ type Identity = {
   kind: IdentityKind;
 };
 type DirectoryIdentity = Omit<Identity,"kind"> & { kind: IdentityKind | "school_admin"; accountId: string | null;
-  username: string | null; gender: CampusGender | null; notes?:string | null; classes: IdentityClass[];
+  roles: (IdentityKind | "school_admin")[]; username: string | null; gender: CampusGender | null; notes?:string | null; classes: IdentityClass[];
   archivedAt: string | null; archivedByExit: boolean; canArchive:boolean };
 type MemberAccount = { accountId: string; name: string; username?: string };
 type ClassType = "administrative" | "training";
@@ -147,7 +147,7 @@ function SchoolDirectory({
   const text = useSchoolText();
   const [query, setQuery] = useState("");
   const t = useAdminText();
-  const [kind, setKind] = useState<DirectoryIdentity["kind"]>("student");
+  const [kind, setKind] = useState<DirectoryIdentity["kind"] | "">("");
   const [archived,setArchived] = useState(false);
   const [status,setStatus] = useState("all");
   const [classId,setClassId] = useState("");
@@ -156,7 +156,8 @@ function SchoolDirectory({
   const options = useSchoolDirectoryOptions(school.id,archived);
   const details = useData<DirectoryIdentity>(viewId ? base + "/identities/" + viewId + "/details" : null);
   const person = details.data?.id === viewId ? details.data : null;
-  const params = new URLSearchParams({kind,status,q:query,archived:String(archived)});
+  const params = new URLSearchParams({status,q:query,archived:String(archived)});
+  if(kind) params.set("kind",kind);
   if(classId) params.set("classId",classId);
   const [edit, setEdit] = useState(false);
   const [editingClasses, setEditingClasses] = useState<string | null>(null);
@@ -181,14 +182,11 @@ function SchoolDirectory({
 
   return (
     <div className="mt-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">{(["student","teacher","school_admin"] as const).map(value=><Button
-          key={value} size="sm" aria-pressed={kind===value} variant={kind===value ? "primary" : "secondary"} onClick={()=>setKind(value)}>
-          <RoleLabel role={value}/> · {options.data?.counts[value] ?? 0}</Button>)}</div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex flex-wrap gap-2">
           {!archived && kind!=="school_admin" && <>
             <Button size="sm" variant="secondary" onClick={() => setImporting(true)}>{text("Import roster","导入名单")}</Button>
-            <Button size="sm" onClick={() => setEdit(true)}><Plus size={14}/>{kind==="teacher" ? text("Create teacher identity","新建教师身份") : text("Create student identity","新建学生身份")}</Button>
+            <Button size="sm" onClick={() => setEdit(true)}><Plus size={14}/>{!kind ? text("Create identity","新建身份") : kind==="teacher" ? text("Create teacher identity","新建教师身份") : text("Create student identity","新建学生身份")}</Button>
           </>}
         </div>
       </div>
@@ -196,13 +194,20 @@ function SchoolDirectory({
         {[false,true].map(value=><Button key={String(value)} size="sm" aria-pressed={archived===value} variant={archived===value?"secondary":"ghost"}
           onClick={()=>{setArchived(value);setStatus("all");}}>{value ? text("Deleted","已删除") : text("Active records","正常档案")}</Button>)}
       </div>
-      <div className="flex flex-wrap items-center gap-2"><div className="min-w-48 flex-1">
+      <search aria-label={text("Identity filters","身份档案筛选")} className="flex flex-wrap items-center gap-2"><div className="min-w-48 flex-1">
         <IdentityFilter onQuery={setQuery} kind="" onKind={()=>{}} fixedKind searchAccount/></div>
+        <select aria-label={text("Filter by role","按角色筛选")} name="role" className={inputClass+" !w-auto max-w-full"} value={kind}
+          onChange={event=>setKind(event.target.value as typeof kind)}>
+          <option value="">{text("All roles","全部角色")}</option>
+          {(["student","teacher","school_admin"] as const).map(role=><option key={role} value={role}>
+            {role==="student" ? text("Student","学生") : role==="teacher" ? text("Teacher","教师") : text("School administrator","学校管理员")} · {options.data?.counts[role] ?? 0}
+          </option>)}
+        </select>
         {!archived && <select aria-label={text("Claim status","认领状态")} className={inputClass+" !w-auto"} value={status} onChange={e=>setStatus(e.target.value)}>
           <option value="all">{text("All statuses","全部状态")}</option><option value="active">{text("Claimed","已认领")}</option>
           <option value="pending">{text("Awaiting claim","待认领")}</option></select>}
         <SchoolClassFilter classes={options.data?.classes ?? []} value={classId} onChange={setClassId}/>
-      </div>
+      </search>
       <Feedback action={{ error: options.error, message }} />
       <SchoolTable<DirectoryIdentity> key={params.toString()} refreshKey={`${revision}:${refreshRevision}`}
         path={`${base}/identities?${params}`} label={text("School identities","校内身份档案")}
@@ -210,6 +215,7 @@ function SchoolDirectory({
         highlightedRowKey={viewId} columns={[
           {title:kind==="student"?text("Student ID","学号"):kind==="teacher"?text("Staff ID","工号"):text("Identity ID","身份编号"),cell:item=><code>{item.number}</code>},
           {title:text("Name","姓名"),cell:item=><button className="font-semibold text-primary hover:underline" onClick={()=>setViewId(item.id)}>{item.name}</button>},
+          {title:text("Role","角色"),cell:item=><div className="flex flex-wrap gap-x-2">{item.roles.map(role=><span key={role}><RoleLabel role={role}/></span>)}</div>},
           {title:text("Gender","性别"),cell:item=>t(genderLabel(item.gender))},
           {title:text("Classes","关联班级"),cell:item=>item.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"},
           {title:text("Linked account","关联账号"),cell:item=>item.username ?? "—"},

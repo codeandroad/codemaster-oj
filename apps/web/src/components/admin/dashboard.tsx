@@ -22,7 +22,7 @@ export function AdminDashboard({ schoolId }: { schoolId?: string }) {
     ? `${peopleHref}&identityId=${encodeURIComponent(id)}`
     : `${peopleHref}?personId=${encodeURIComponent(id)}`;
   const classHref = (id: string) => schoolId
-    ? `${schoolWorkspaceHref(schoolId, "classes", "teacher")}&classId=${encodeURIComponent(id)}`
+    ? `${schoolWorkspaceHref(schoolId, "classes", "admin")}&classId=${encodeURIComponent(id)}`
     : `${peopleHref}?classId=${encodeURIComponent(id)}`;
   return (
     <>

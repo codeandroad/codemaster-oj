@@ -40,6 +40,7 @@ const sections: Record<string, Label> = {
   "/teacher/reports": ["教学报告", "Reports"],
   "/teacher/imports": ["导入中心", "Imports"],
   "/admin/accounts": ["账号与角色", "Accounts"],
+  "/admin/classes": ["班级管理", "Classes"],
   "/admin/people": ["身份档案", "Identities"],
   "/admin/imports": ["导入中心", "Imports"],
   "/admin/problem-banks": ["题库管理", "Problem banks"],

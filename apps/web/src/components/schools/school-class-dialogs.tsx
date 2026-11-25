@@ -29,12 +29,13 @@ import type { SchoolClassRecord } from "./school-classes";
 
 export function SchoolClassEditor({
   school,
-  item,
+  item, renameOnly = false,
   onClose,
   onSaved,
 }: {
   school: School;
   item?: SchoolClassRecord;
+  renameOnly?: boolean;
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
@@ -67,7 +68,7 @@ export function SchoolClassEditor({
               method: item ? "PATCH" : "POST",
               body: {
                 name: name.trim(),
-                type,
+                ...(!renameOnly && {type}),
                 ...(item ? { expectedRevision: item.revision } : {}),
               },
             },
@@ -85,7 +86,7 @@ export function SchoolClassEditor({
   return (
     <Modal
       title={
-        item ? text("Edit class", "编辑班级") : text("New class", "新建班级")
+        item ? (renameOnly ? text("Rename class","修改班级名称") : text("Edit class", "编辑班级")) : text("New class", "新建班级")
       }
       description={schoolDisplayName(school, locale)}
       onClose={() => {
@@ -115,7 +116,7 @@ export function SchoolClassEditor({
             {text("Enter a class name.", "请输入班级名称。")}
           </p>
         )}
-        <label className="block space-y-1 text-sm font-semibold">
+        {!renameOnly && <label className="block space-y-1 text-sm font-semibold">
           <span>{text("Class type", "班级类型")}</span>
           <select
             className={inputClass}
@@ -128,7 +129,7 @@ export function SchoolClassEditor({
             </option>
             <option value="training">{text("Training class", "训练班")}</option>
           </select>
-        </label>
+        </label>}
         <Feedback action={action} />
         <div className="flex justify-end gap-2">
           <Button
@@ -146,6 +147,41 @@ export function SchoolClassEditor({
       </form>
     </Modal>
   );
+}
+
+type TeacherPermissions = {canRename:boolean; canManageStudents:boolean};
+function PermissionFields({value,onChange}:{value:TeacherPermissions;onChange:(next:TeacherPermissions)=>void}) {
+  const text=useSchoolText();
+  return <fieldset className="space-y-2 rounded border border-border px-3 py-2 text-sm">
+    <legend>{text("Class permissions","班级权限")}</legend>
+    <label className="flex items-center gap-2"><input type="checkbox" checked={value.canManageStudents}
+      onChange={e=>onChange({...value,canManageStudents:e.target.checked})}/>
+      {text("Add, remove and import students","添加、移出及导入学生")}</label>
+    <label className="flex items-center gap-2"><input type="checkbox" checked={value.canRename}
+      onChange={e=>onChange({...value,canRename:e.target.checked})}/>
+      {text("Rename class","修改班级名称")}</label>
+  </fieldset>;
+}
+
+export function TeacherPermissionsEditor({school,item,teacher,onClose,onSaved}:{
+  school:School; item:SchoolClassRecord; teacher:TeacherPermissions & {id:string;name:string};
+  onClose:()=>void; onSaved:()=>void;
+}) {
+  const text=useSchoolText(), localError=useSchoolError(), action=useMutation();
+  const [permissions,setPermissions]=useState({canManageStudents:teacher.canManageStudents,canRename:teacher.canRename});
+  return <Modal title={text("Class permissions","班级权限")} description={item.name+" · "+teacher.name} onClose={onClose}>
+    <form className="space-y-4" onSubmit={event=>{event.preventDefault();void action.run(async()=>{
+      try {
+        await productionApi(`schools/${school.id}/classes/${item.id}/roster/${teacher.id}`,{method:"PATCH",body:{permissions,expectedPermissions:{canRename:teacher.canRename,canManageStudents:teacher.canManageStudents}}});
+        onClose();onSaved();
+      } catch(error) {throw localError(error);}
+    });}}>
+      <PermissionFields value={permissions} onChange={setPermissions}/>
+      <Feedback action={action}/>
+      <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>{text("Cancel","取消")}</Button>
+        <Button type="submit" disabled={action.busy}>{text("Save","保存")}</Button></div>
+    </form>
+  </Modal>;
 }
 
 type Candidate = {
@@ -174,6 +210,8 @@ export function SchoolClassRosterPicker({
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [unassigned,setUnassigned] = useState(false);
+  const [permissions,setPermissions] = useState({canManageStudents:true,canRename:false});
   const [selected, setSelected] = useState<Candidate | null>(null);
   const lock = useRef(false);
   async function add() {
@@ -183,7 +221,7 @@ export function SchoolClassRosterPicker({
       try {
         await productionApi(`schools/${school.id}/classes/${item.id}/roster`, {
           method: "POST",
-          body: { identityId: selected.id },
+          body: { identityId: selected.id, ...(kind === "teacher" && {permissions}) },
         });
         onClose();
         onSaved();
@@ -207,7 +245,7 @@ export function SchoolClassRosterPicker({
     >
       <div className="space-y-4">
         <form
-          className="flex gap-2"
+          className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             setQuery(search.trim());
@@ -217,7 +255,7 @@ export function SchoolClassRosterPicker({
         >
           <input
             autoFocus
-            className={inputClass}
+            className={inputClass+" min-w-36 flex-1"}
             value={search}
             maxLength={100}
             disabled={action.busy}
@@ -225,13 +263,18 @@ export function SchoolClassRosterPicker({
             placeholder={text("Search name or ID", "搜索姓名或编号")}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {kind === "student" && <select name="placement" aria-label={text("Class placement","分班状态")} className={inputClass+" !w-auto max-w-full"}
+            value={unassigned ? "unassigned" : "all"} onChange={event=>{setUnassigned(event.target.value==="unassigned");setPage(1);setSelected(null);setQuery(search.trim());}}>
+            <option value="all">{text("All eligible students","全部可添加学生")}</option>
+            <option value="unassigned">{text("Unassigned students","未分班学生")}</option>
+          </select>}
           <Button type="submit" variant="secondary" disabled={action.busy}>
             {text("Search", "搜索")}
           </Button>
         </form>
         <CandidateRows
-          key={`${kind}:${query}:${page}`}
-          path={`schools/${school.id}/classes/${item.id}/candidates?${new URLSearchParams({ kind, q: query, page: String(page) })}`}
+          key={`${kind}:${query}:${page}:${unassigned}`}
+          path={`schools/${school.id}/classes/${item.id}/candidates?${new URLSearchParams({ kind, q: query, page: String(page), unassigned: String(unassigned) })}`}
           selected={selected}
           onSelect={setSelected}
           disabled={action.busy}
@@ -247,6 +290,7 @@ export function SchoolClassRosterPicker({
             {selected.name} · {selected.number}
           </p>
         )}
+        {kind === "teacher" && <PermissionFields value={permissions} onChange={setPermissions}/>}
         {selected?.kind === "teacher" && !selected.accountLinked && (
           <p className="text-sm text-muted-foreground">
             {text(

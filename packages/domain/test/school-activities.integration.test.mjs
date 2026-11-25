@@ -39,7 +39,9 @@ test('school activities preserve scope, fixed versions, deadline receipts and re
       identities[name] = (await pool.query('INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,$2,$3,$3,$4) RETURNING id', [school.id, role, name, users[name].id])).rows[0].id;
     }
     const cls = (await pool.query("INSERT INTO school_classes(school_id,name,type) VALUES($1,'First class','training') RETURNING id", [school.id])).rows[0];
-    await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3)', [school.id, cls.id, identities.student]);
+    await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)', [school.id, cls.id, identities.student, identities.teacher]);
+    const second = (await pool.query("INSERT INTO school_classes(school_id,name) VALUES($1,'Second class') RETURNING id", [school.id])).rows[0];
+    await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)',[school.id,second.id,identities.peer,identities.teacher]);
     const call = async (name, route, method = 'GET', body = {}) => (await schoolActivitiesOperation({ pool: app, user: users[name], route: route.split('?')[0], url: new URL('http://test' + route), method, body })).body;
     const practice = async (name, route, method = 'GET', body = {}) => (await schoolPracticeOperation({ pool: app, user: users[name], route: route.split('?')[0], url: new URL('http://test' + route), method, body })).body;
     const path = `/schools/${school.id}/activities`, ppath = `/schools/${school.id}/problems`;
@@ -56,8 +58,10 @@ test('school activities preserve scope, fixed versions, deadline receipts and re
     const config = (extra = {}) => ({ kind: 'assignment', title: 'Practice assignment', description: 'Do the assigned problems.', problems: [{ problemId: p2.id, versionId: p2.versionId, points: 40 }, { problemId: p.id, versionId: p.versionId, points: 60 }], classIds: [cls.id], identityIds: [identities.peer, identities.unassigned], requestId: randomUUID(), ...extra });
     const submit = (activity, problem = p, fields = {}) => call('student', `${path}/${activity.id}/problems/${problem.id}/submissions`, 'POST', { kind: 'submit', code: 'print(5)', language: 'python', requestId: randomUUID(), ...fields });
     let assignment, timed, job;
-    await t.test('cross-class/unassigned selection, stable order, create retry, owner and school authorization', async () => {
+    await t.test('multi-class audience requires teacher assignment and enrollment before publishing', async () => {
       const body = config();
+      await assert.rejects(call('teacher',path,'POST',body), error=>error.code==='CLASS_AUDIENCE');
+      await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3)',[school.id,second.id,identities.unassigned]);
       const copies = await Promise.all([call('teacher', path, 'POST', body), call('teacher', path, 'POST', body)]);
       assignment = copies[0]; assert.equal(copies[0].id, copies[1].id);
       assert.equal(assignment.participantCount, 3); assert.deepEqual(assignment.problems.map(x => x.id), [p2.id, p.id]);
@@ -67,6 +71,9 @@ test('school activities preserve scope, fixed versions, deadline receipts and re
       await assert.rejects(call('student', `${path}/options`), e => e.status === 403);
       await assert.rejects(call('teacher', path, 'POST', config({ identityIds: [randomUUID()] })), e => e.status === 404);
       await assert.rejects(call('outsider', `/schools/${beta.id}/activities`, 'POST', config({ classIds: [], identityIds: [] })), e => e.status === 404);
+      await pool.query('DELETE FROM school_class_roster WHERE school_id=$1 AND class_id=$2 AND identity_id=$3',[school.id,cls.id,identities.teacher]);
+      await assert.rejects(call('teacher',`${path}/${assignment.id}/publish`,'POST',{expectedRevision:assignment.revision}),e=>e.code==='CLASS_AUDIENCE');
+      await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3)',[school.id,cls.id,identities.teacher]);
       assignment = await call('teacher', `${path}/${assignment.id}/publish`, 'POST', { expectedRevision: assignment.revision });
       await assert.rejects(call('teacher', `${path}/${assignment.id}`, 'PATCH', { ...body, expectedRevision: assignment.revision }), e => e.code === 'ACTIVITY_FROZEN');
       assert.equal((await call('unassigned', path)).items.length, 1);

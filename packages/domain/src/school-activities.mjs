@@ -1,6 +1,7 @@
 import { addAssignmentFeedback, assignmentCompletionCounts, assignmentCourses, assignmentHasRuns, assignmentMetadata, assignmentSubmissions, orderAssignmentProblems, recordedParticipants } from './school-assignment-authoring.mjs';
 import { assignmentCatalogOptions, prepareAssignmentEdition } from './catalog-problem-publication.mjs';
 import { lockPlatformContent } from './platform-content-access.mjs';
+import { teachingClasses } from './school-teaching.mjs';
 import { readableClassCourse, schoolPublishedProblemOptions } from './school-courses.mjs';
 import { assignmentChange, notifySchoolAssignmentChange } from './assignment-changes.mjs';
 import { schoolAssignmentReceiptGrades } from './assignment-grades.mjs';
@@ -228,7 +229,7 @@ async function saveDraftRule(db, schoolId, user, role, activityId, rule) {
   if (!rule || typeof rule !== 'object' || Array.isArray(rule)) fail(400, 'VALIDATION', 'Invalid scholarship rule.');
   return configureSchoolActivityScholarshipRule(db, schoolId, user, role, activityId, 'activity', rule);
 }
-async function validateSelections(db, schoolId, data, {expandClasses=true, user, courseId} = {}) {
+async function validateSelections(db, schoolId, data, {expandClasses=true, user, role, courseId, publishedActivityId=null}) {
   if (data.problems.length) {
     const {rows} = await db.query(`SELECT p.id,p.published_version_id FROM school_problems p
       JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id)
@@ -254,6 +255,17 @@ async function validateSelections(db, schoolId, data, {expandClasses=true, user,
   }
   if (data.identityIds.length > 2000) fail(400, 'VALIDATION', 'Select at most 2000 students.');
   if (data.identityIds.length && (await db.query("SELECT id FROM school_identities WHERE school_id=$1 AND id=ANY($2::uuid[]) AND kind='student' AND archived_at IS NULL", [schoolId, data.identityIds])).rowCount !== data.identityIds.length) fail(404, 'NOT_FOUND', 'A selected student is unavailable.');
+  if (role === 'teacher' && (data.classIds.length || data.identityIds.length)) {
+    const taught = (await teachingClasses(db,schoolId,user.id,role)).map(c=>c.id);
+    const {rows:[outside]} = await db.query(`SELECT
+      EXISTS (SELECT 1 FROM unnest($2::uuid[]) chosen(id) WHERE NOT (chosen.id=ANY($4::uuid[]))
+        AND NOT EXISTS (SELECT 1 FROM school_activity_classes ac WHERE ac.school_id=$1 AND ac.activity_id=$5 AND ac.class_id=chosen.id))
+      OR EXISTS (SELECT 1 FROM unnest($3::uuid[]) chosen(id) WHERE NOT EXISTS
+        (SELECT 1 FROM school_class_roster r WHERE r.school_id=$1 AND r.identity_id=chosen.id AND r.class_id=ANY($4))
+        AND NOT EXISTS (SELECT 1 FROM school_activity_participants p WHERE p.school_id=$1 AND p.activity_id=$5 AND p.identity_id=chosen.id)) AS denied`,
+      [schoolId,data.classIds,data.identityIds,taught,publishedActivityId]);
+    if (outside.denied) fail(403,'CLASS_AUDIENCE','请选择本人负责的班级及学生');
+  }
 }
 async function replaceProblemSelections(db, schoolId, activityId, problems, previousProblems) {
   const previous=new Map(previousProblems.map(p=>[p.problem_id,p]));
@@ -414,19 +426,22 @@ async function assignmentPreview(db, { a, user, method, action, id, submissions,
       resultsPublishedAt: null, canSubmit: true, preview: true, revision: a.revision },
   });
 }
-async function options(db, schoolId, user, assignmentEditor) {
+async function options(db, schoolId, user, role, assignmentEditor) {
   const items = await schoolPublishedProblemOptions(db, schoolId);
+  const classes = await teachingClasses(db, schoolId, user.id, role);
   const students = (await db.query(`SELECT i.id,i.name,i.number,i.account_id IS NOT NULL AS activated,
     coalesce((SELECT jsonb_agg(r.class_id ORDER BY r.class_id) FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
-      WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.archived_at IS NULL),'[]') AS "classIds"
-    FROM school_identities i WHERE i.school_id=$1 AND i.kind='student' AND i.archived_at IS NULL ORDER BY i.name,i.number,i.id LIMIT 2001`, [schoolId])).rows;
+      WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.id=ANY($2::uuid[]) AND c.archived_at IS NULL),'[]') AS "classIds"
+    FROM school_identities i WHERE i.school_id=$1 AND i.kind='student' AND i.archived_at IS NULL
+      AND ($3 OR EXISTS (SELECT 1 FROM school_class_roster r WHERE r.school_id=i.school_id AND r.identity_id=i.id AND r.class_id=ANY($2)))
+    ORDER BY i.name,i.number,i.id LIMIT 2001`, [schoolId,classes.map(c=>c.id),role === 'school_admin'])).rows;
   if (students.length > 2000) fail(409, 'AUDIENCE_TOO_LARGE', 'This activity selector supports schools with up to 2000 student identities.');
   const settings = await schoolScholarshipSettings(db, schoolId);
   const courses = assignmentEditor ? await assignmentCourses(db,schoolId,user) : [];
   const linkedIds = [...new Set(courses.filter(c=>c.scope==='platform').flatMap(c=>c.problemIds))];
   const platformProblems = await assignmentCatalogOptions(db,schoolId,linkedIds);
   return { ...(assignmentEditor && {courses,platformProblems,firstAcPoints:settings.firstAcPoints}),
-    activityRewardCap: settings.activityRewardCap, problems: items, students, classes: (await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id', [schoolId])).rows };
+    activityRewardCap: settings.activityRewardCap, problems: items, students, classes };
 }
 async function publishResults(db, loaded, user) {
   const { a } = loaded;
@@ -464,7 +479,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     const staff = role === 'school_admin' || role === 'teacher';
     if (match[2] === 'options' && method === 'GET') {
       if (!staff) fail(403, 'FORBIDDEN', 'Teaching role required.');
-      return reply(await options(db, schoolId,user,url.searchParams.get('view')==='assignment'));
+      return reply(await options(db, schoolId,user,role,url.searchParams.get('view')==='assignment'));
     }
     if (!match[2] && method === 'GET') {
       const kind = enumValue(url.searchParams.get('kind') ?? 'assignment', ['assignment', 'timed'], 'Activity type');
@@ -510,7 +525,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       const a = (await db.query(`INSERT INTO school_activities(school_id,owner_account_id,kind,title,description,starts_at,ends_at,duration_minutes,request_id,request_hash)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, [schoolId, user.id, kind, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes, requestId, hash])).rows[0];
       const courseId=editor ? await assignmentMetadata(db,a,user,body) : null;
-      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,courseId});
+      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role,courseId});
       await storeSelections(db,schoolId,a.id,data);
       if (rule !== undefined) await saveDraftRule(db, schoolId, user, role, a.id, rule);
       await auditSchool(db, schoolId, user.id, 'school.activity.create', a.id);
@@ -542,7 +557,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       const data = normalize(body, a.kind);
       const editor=a.kind==='assignment' && body.audienceMode==='selected';
       const courseId=editor ? await assignmentMetadata(db,a,user,body) : a.platform_course_id;
-      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,courseId});
+      await validateSelections(db,schoolId,data,{expandClasses:!editor,user,role,courseId});
       await db.query(`UPDATE school_activities SET title=$3,description=$4,starts_at=$5,ends_at=$6,duration_minutes=$7,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2`, [schoolId, a.id, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes]);
       const previous = await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2', [schoolId, a.id]);
       await storeSelections(db, schoolId, a.id, data, previous.rows);
@@ -563,7 +578,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         if (await assignmentHasRuns(db,a)) fail(409,'ACTIVITY_FROZEN','Problems with submission history are fixed.');
         const next=normalize({...body,title,description},'assignment');
         if (!next.problems.length) fail(400,'VALIDATION','Select at least one problem.');
-        await validateSelections(db,schoolId,next,{expandClasses:false,user,courseId});
+        await validateSelections(db,schoolId,{problems:next.problems,classIds:[],identityIds:[]},{expandClasses:false,user,role,courseId});
         const previous=await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id]);
         await replaceProblemSelections(db,schoolId,a.id,next.problems,previous.rows);
       }
@@ -571,7 +586,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (body.identityIds!==undefined) {
         const students=ids(body.identityIds,'Students'),classes=ids(body.classIds??[],'Classes',100);
         if (!students.length || due && +new Date(due)<=Date.now()) fail(400,'VALIDATION','Select students before the deadline.');
-        await validateSelections(db,schoolId,{problems:[],identityIds:students,classIds:classes},{expandClasses:false});
+        await validateSelections(db,schoolId,{problems:[],identityIds:students,classIds:classes},{expandClasses:false,user,role,publishedActivityId:a.id});
         const old=(await db.query('SELECT identity_id,exempt FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id])).rows;
         const protectedIds=await recordedParticipants(db,a);
         if (old.some(p=>p.exempt ? students.includes(p.identity_id) : protectedIds.includes(p.identity_id) && !students.includes(p.identity_id)))
@@ -598,7 +613,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (a.kind==='assignment' && (a.school_course_id||a.platform_course_id)) await assignmentMetadata(db,a,user,{});
       const data = await detail(db, loaded, user);
       if (a.kind === 'timed' && (!a.starts_at || !a.ends_at || !a.duration_minutes)) fail(400, 'VALIDATION', 'Set an opening time, closing time and duration before publishing timed practice.');
-      await validateSelections(db, schoolId, { problems: data.problems.map(p => ({ problemId: p.id, versionId: p.versionId })), identityIds: data.identityIds, classIds: [] },{user,courseId:a.platform_course_id});
+      await validateSelections(db, schoolId, { problems: data.problems.map(p => ({ problemId: p.id, versionId: p.versionId })), identityIds: data.identityIds, classIds: data.classIds },{expandClasses:false,user,role,courseId:a.platform_course_id});
       if (!data.problems.length || !data.participantCount) fail(400, 'VALIDATION', 'Select at least one problem and student before publishing.');
       if (a.ends_at && +new Date(a.ends_at) <= Date.now()) fail(400, 'VALIDATION', 'The closing time must be in the future.');
       await db.query("UPDATE school_activities SET state='Published',published_at=clock_timestamp(),revision=revision+1 WHERE school_id=$1 AND id=$2", [schoolId, a.id]);

@@ -1,3 +1,4 @@
+import { accountHomepage, defaultMessageSchool } from './homepages.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { schoolCatalogActivityTitle } from './catalog-problem-publication.mjs';
 import { schoolSolvedSubjects } from './school-leaderboard.mjs';
@@ -272,7 +273,13 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  if (section==='mentions' && method==='GET') return listMentionCandidates(ctx,target.identity_id,accountId);
  if (section==='messages') {
   if (!messageId && method==='GET') return listMessages(ctx,target.identity_id,accountId,{publicPractice:true});
-  if (!messageId && method==='POST') return createMessage(ctx,target.identity_id,accountId);
+  if (!messageId && method==='POST') {
+   if (ctx.body.quoteId==null) {
+    const schoolId=await defaultMessageSchool(ctx.pool,user.id,accountId);
+    if (schoolId) return handleCommunity({...ctx,route:`/schools/${schoolId}/profiles/${accountId}/messages`});
+   }
+   return createMessage(ctx,target.identity_id,accountId);
+  }
   if (action==='replies' && method==='GET') return listMessages(ctx,target.identity_id,accountId,{publicPractice:true,threadId:messageId});
   if (action==='like' && method==='POST') return reactToMessage(ctx,target.identity_id,messageId,accountId);
   if (messageId && !action && method==='DELETE') return deleteMessage(ctx,target.identity_id,messageId,accountId);
@@ -303,6 +310,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
 
 async function listMessages(ctx, identityId, ownerAccountId, {publicPractice=false, threadId=null} = {}) {
  const practiceAccountId=publicPractice ? ownerAccountId : null;
+ const before=ctx.homepageBefore;
  const {page,pageSize} = paging(ctx.url);
  const own=ctx.user.id===ownerAccountId;
  const params=[[identityId,ownerAccountId],ctx.user.id,own,practiceAccountId];
@@ -314,16 +322,18 @@ async function listMessages(ctx, identityId, ownerAccountId, {publicPractice=fal
     a.avatar author_avatar,i.id author_avatar_identity_id,${publicAlias()} author_alias,
     ${publicPractice ? publicName() : "COALESCE(NULLIF(btrim(a.nickname),''),i.name)"} author_nickname
    ${visibleMessageSql}
+   ${before ? 'AND m.school_id IS NOT DISTINCT FROM $8::uuid' : ''}
  ), page AS (
    SELECT * FROM visible WHERE thread_id IS NOT DISTINCT FROM $5::uuid
     AND ($5::uuid IS NULL OR EXISTS(SELECT 1 FROM visible WHERE id=$5 AND thread_id IS NULL))
+   ${before ? 'AND ($9::timestamptz IS NULL OR (created_at,id)<($9,$10::uuid))' : ''}
    ORDER BY created_at DESC,id DESC LIMIT $6 OFFSET $7
  ), totals AS (
    SELECT count(*) FILTER (WHERE thread_id IS NOT DISTINCT FROM $5::uuid)::int total,
     count(*) FILTER (WHERE thread_id IS NOT NULL AND EXISTS(SELECT 1 FROM visible root WHERE root.id=visible.thread_id))::int reply_total
    FROM visible
  )
- SELECT totals.*,p.*,q.body quote_body,q.author_nickname quote_nickname,
+ SELECT totals.*,p.*,${before ? `to_char(p.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sort_at,` : ''}q.body quote_body,q.author_nickname quote_nickname,
   (SELECT count(*)::int FROM visible r WHERE r.thread_id=p.id) reply_count,
   (SELECT count(*)::int FROM student_guestbook_likes l WHERE l.message_id=p.id) like_count,
   EXISTS(SELECT 1 FROM student_guestbook_likes l WHERE l.message_id=p.id AND l.account_id=$2) liked,
@@ -337,10 +347,11 @@ async function listMessages(ctx, identityId, ownerAccountId, {publicPractice=fal
         AND membership.school_id=$8 AND profile_account.id=tagged.id) member ON true`}
    WHERE tag.message_id=p.id) mentions
  FROM totals LEFT JOIN page p ON true LEFT JOIN visible q ON q.id=p.quote_id
- ORDER BY p.created_at DESC,p.id DESC`,publicPractice ? [...params,threadId,pageSize,(page-1)*pageSize]
-   : [...params,threadId,pageSize,(page-1)*pageSize,ctx.schoolId]);
+ ORDER BY p.created_at DESC,p.id DESC`,[...params,threadId,pageSize+(before?1:0),(page-1)*pageSize,
+    ...(!publicPractice || before ? [ctx.schoolId??null] : []),...(before??[])]);
  const moderator=publicPractice ? await isPlatformAdministrator(ctx.pool,ctx.user.id) : admin(ctx.user);
- return response({items:rows.filter(row=>row.id).map(row=>messageShape(row,ctx.user,own,moderator,publicPractice)),
+ return response({items:rows.filter(row=>row.id).map(row=>({...messageShape(row,ctx.user,own,moderator,publicPractice),
+   ...(before && {cursor:row.sort_at+'~'+row.id})})),
   acceptingMessages:await acceptsMessages(ctx.pool,ownerAccountId,publicPractice ? 'practice' : 'school'),
   total:rows[0].total,replyTotal:rows[0].reply_total,page,pageSize});
 }
@@ -572,6 +583,8 @@ async function listSchoolProfiles(ctx) {
 }
 
 export async function handleCommunity(ctx) {
+ const homepage=ctx.method==='GET' && ctx.route.match(/^\/homepages\/([^/]+)(\/messages)?$/);
+ if (homepage) return accountHomepage(ctx,uuid(homepage[1]),Boolean(homepage[2]),handleCommunity);
  if (ctx.route==='/account/profile-cover' && ctx.method==='PATCH') return updateProfileCover(ctx);
  if (ctx.route==='/account/guestbook-settings' && ['GET','PATCH'].includes(ctx.method)) return guestbookSettings(ctx);
  const scoped=ctx.route.match(/^(\/platform)?\/schools\/([^/]+)(\/(?:profiles(?:\/.*)?|profile-message-reports(?:\/.*)?))$/);
@@ -597,6 +610,7 @@ export async function handleCommunity(ctx) {
   const identityId=uuid(rawIdentity,'主页 ID');
   const threadId=rawThread ? uuid(rawThread,'留言 ID') : null;
   const target=await visibleProfile(ctx.pool,ctx,identityId);
+  if (ctx.resolveHomepageAccount && !section) return response({accountId:target.account_id});
   if (!section) return profile(ctx,target);
   if (section==='activity') return activity(ctx,target);
   return listMessages(ctx,target.id,target.account_id,{threadId});

@@ -553,7 +553,50 @@ test('school claims and reviewed applications stay within each school on the rea
         assert.ok((await post('/platform/schools/'+alpha.id+'/administrators',platform,{username:'guestbook-reviewer'})).status<300);
         await add(schoolBook,reviewer,'Reopened school reply',schoolRoot);
         assert.deepEqual((await patch('practice',true)).data,{schoolOpen:true,practiceOpen:true,profileEnabled:true});
-        await add(practiceBook,betaAdmin,'Reopened practice message');
+        const betaRoot=await add(practiceBook,betaAdmin,'School feedback from a shared link');
+        const homepage='/homepages/'+learner.data.user.id;
+        const feed=homepage+'/messages';
+        const body=async (url,auth)=>{
+          const result=await request(url,{auth});
+          assert.equal(result.status,200,JSON.stringify(result.data.error));
+          return result.data;
+        };
+        const messageIds=async auth=>(await body(feed,auth)).items.map(item=>item.id);
+        assert.equal((await request(feed)).status,401);
+        assert.equal((await body(homepage,betaAdmin)).books[0].schoolId,beta.id);
+        assert.equal((await body(homepage+'?preferredSchoolId='+beta.id,learner)).books[0].schoolId,beta.id);
+        assert.equal((await body(homepage+'?preferredSchoolId='+alpha.id,another)).books[0].schoolId,null);
+        assert.equal((await body('/homepages/'+local.id+'?schoolId='+alpha.id,alphaAdmin)).accountId,learner.data.user.id);
+        assert.equal((await request('/homepages/'+local.id+'?schoolId='+alpha.id,{auth:another})).status,404);
+        assert.equal((await request('/homepages/'+local.id+'?schoolId='+alpha.id+'&platform=1',{auth:another})).status,403);
+        assert.deepEqual(await messageIds(learner),[betaRoot,publicRoot,schoolRoot]);
+        assert.deepEqual(await messageIds(alphaAdmin),[publicRoot,schoolRoot]);
+        assert.deepEqual(await messageIds(betaAdmin),[betaRoot,publicRoot]);
+        assert.deepEqual(await messageIds(another),[publicRoot]);
+        assert.deepEqual((await body(practiceBook,another)).items.map(item=>item.id),[publicRoot]);
+        assert.equal((await body('/homepages/'+local.id+'/messages?schoolId='+alpha.id+'&platform=1',platform)).total,2);
+        let next=null;
+        for (const id of [betaRoot,publicRoot,schoolRoot]) {
+          const result=await body(feed+'?pageSize=1'+(next?'&before='+encodeURIComponent(next):''),learner);
+          assert.equal(result.total,3);
+          assert.deepEqual(result.items.map(item=>item.id),[id]);
+          next=result.next;
+        }
+        assert.equal(next,null);
+        assert.equal((await request(feed+'?before=invalid',{auth:learner})).status,400);
+        const colleague=await registerPersonal(request,'homepage-teacher',password);
+        await seedUnlinkedMembership(pool,alpha.id,colleague.data.user.id,'teacher');
+        await patch('school',false);
+        assert.equal((await post(practiceBook,colleague,{body:'New feedback'})).data.error.code,'GUESTBOOK_CLOSED');
+        await patch('school',true);
+        const feedback=await add(practiceBook,colleague,'Only Alpha can see this');
+        assert.deepEqual(await messageIds(colleague),[feedback,publicRoot,schoolRoot]);
+        assert.deepEqual(await messageIds(another),[publicRoot]);
+        await request(practiceProfile,{method:'PATCH',auth:learner,body:{profileEnabled:false}});
+        assert.equal((await request(homepage,{auth:another})).status,404);
+        assert.equal((await request(feed,{auth:another})).status,404);
+        assert.deepEqual(await messageIds(alphaAdmin),[feedback,schoolRoot]);
+        assert.deepEqual(await messageIds(learner),[feedback,betaRoot,publicRoot,schoolRoot]);
       });
     } finally {
       await app?.close();

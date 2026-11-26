@@ -21,6 +21,7 @@ const SHARED_ENDPOINTS = new Set([
 
 export async function requireWorkspaceRoute(user, route, method) {
   if (SHARED_ENDPOINTS.has(`${method} ${route}`)
+    || (method === 'GET' && /^\/homepages\/[^/]+(?:\/messages)?$/.test(route))
     || (method === 'GET' && route === '/account-notifications')
     || (method === 'POST' && /^\/account-notifications\/(read-all|[^/]+\/read)$/.test(route))
     || /^\/schools(?:\/|$)/.test(route)

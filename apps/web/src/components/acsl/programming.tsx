@@ -1,4 +1,5 @@
 "use client";
+import { accountHomepageHref } from "@/lib/campus-routes";
 
 import {
   useCallback,
@@ -10,7 +11,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
-import { schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
 import { useLocale } from "@/components/locale-context";
 import { Loading } from "@/components/admin/common";
 import {
@@ -338,7 +338,7 @@ function ProgrammingWorkspace({
       account: () => (
         <AccountMenu
           user={user}
-          homepageHref={schoolWorkspaceHref(path.split("/")[1], "me")}
+          homepageHref={accountHomepageHref(user.id, "school", path.split("/")[1])}
           busy={loggingOut}
           onLogout={() => setLogoutOpen(true)}
         />

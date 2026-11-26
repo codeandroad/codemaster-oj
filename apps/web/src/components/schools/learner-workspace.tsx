@@ -1,4 +1,5 @@
 "use client";
+import { accountHomepageHref } from "@/lib/campus-routes";
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -42,11 +43,12 @@ import { schoolWorkspaceHref } from "./school-workspace-location";
 import { LearnerRecords } from "./public-study-records";
 
 type LearnerProps = {
+  sharedAccount?:string;
   user: CampusUser; pathname: string; school?: School; onLogout: () => void;
   onUserSaved: (user: CampusUser) => void; onSchoolsChanged?: () => void;
 };
 
-export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved, onSchoolsChanged }: LearnerProps) {
+export function LearnerWorkspace({ sharedAccount, user, pathname, school, onLogout, onUserSaved, onSchoolsChanged }: LearnerProps) {
   const text = useSchoolText(), {locale} = useLocale();
   const search = useSearchParams(), router = useRouter();
   const navLabel = useWorkspaceNavigationLabel();
@@ -55,7 +57,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const memberships = useWorkspaceData<{items:School[]}>("schools");
   const acslEnabled = useAcslEnabled(school?.id,false);
   const [, , publicSection, resourceId] = pathname.split("/");
-  const requested = school ? (search.get("join") === "1" ? "settings" : search.get("section")) : publicSection;
+  const requested = sharedAccount ? (sharedAccount === user.id ? "me" : "people") : school ? (search.get("join") === "1" ? "settings" : search.get("section")) : publicSection;
   const section = requested === "personal-settings" ? "settings" : requested || "home";
   const navigation = learnerNavigation(school?.id);
   const href = (key:string) => school ? schoolWorkspaceHref(school.id,key === "settings" ? "personal-settings" : key)
@@ -69,7 +71,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const label = item ? navLabel(item) : otherLabels[section] ?? scopeName;
   const wallet = school ? `schools/${school.id}/scholarship/me` as const : "practice/scholarship/me";
   const classId = school && search.get("classId");
-  const profileId = school ? search.get("profileId") : resourceId;
+  const profileId = sharedAccount ?? (school ? search.get("profileId") : resourceId);
   const schools = memberships.data?.items.filter(s=>s.roles.includes("student")) ?? [];
   function switchWorkspace(id:string) {
     const next = learnerNavigation(id || undefined).find(item=>item.section===section);
@@ -87,7 +89,8 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
       break;
     case "people":
     case "leaderboard":
-      content = profileId ? <StudentPublicProfile key={profileId} profileId={profileId} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>
+      content = profileId ? <StudentPublicProfile key={profileId} profileId={profileId} schoolId={sharedAccount ? undefined : school?.id} preferredSchoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}
+        schoolRoles={school?.roles} onUserSaved={profileId===user.id ? onUserSaved : undefined}/>
         : school ? <SchoolLeaderboard schoolId={school.id}/> : <PublicPracticeLeaderboard/>;
       break;
     case "problems":
@@ -147,7 +150,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
             navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section)}))}/>}
             account={<><ScholarshipBalance identityId={user.id} endpoint={wallet} href={href("scholarship")}/>
               <NotificationDropdown key={school?.id ?? "public"} workspace={school ? "student" : "public"} schoolId={school?.id} scholarshipHref={href("scholarship")}/>
-              <AccountMenu user={user} homepageHref={href("me")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
+              <AccountMenu user={user} homepageHref={accountHomepageHref(user.id,school ? "school" : "practice",school?.id)} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
                 onLogout={()=>void logout.run(async()=>{try {await productionApi("auth/logout",{method:"POST"});} catch(error) {if (!(error instanceof ApiError && error.status===401)) throw error;} onLogout();})}/>
             </>}>
             <Feedback action={logout}/><section key={`${school?.id ?? "public"}:${section}:${resourceId ?? ""}:${classId ?? ""}`} className="min-w-0">{content}</section>

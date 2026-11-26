@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {accountHomepageHref,isCampusRoute,loginReturnTo} from '../src/lib/campus-routes.ts';
 import {schoolBookmarkQuery} from '../src/components/schools/school-workspace-location.ts';
 import {publicPracticeReturnHref} from '../src/components/schools/public-workspace-model.ts';
 
@@ -26,4 +27,17 @@ test('returning from a public course exercise inside a school preserves the chap
   const schoolHref=publicPracticeReturnHref('schoolId=s&section=problems&scope=public&publicCourseId=c&publicChapterId=h&problemId=p&courseScope=school&courseQ=Python','/schools');
   const schoolCourse=new URL(schoolHref,'http://localhost');
   assert.deepEqual(Object.fromEntries(schoolCourse.searchParams),{schoolId:'s',section:'courses',scope:'school',publicCourseId:'c',chapterId:'h',courseQ:'Python'});
+});
+
+test('the same account permalink works in each workspace and survives sign-in',()=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  for (const scope of ['platform','practice','school',undefined]) {
+    const href=accountHomepageHref(id,scope,'joined-school','teacher');
+    const url=new URL(href,'http://localhost');
+    assert.equal(url.pathname,'/people/'+id);
+    assert.equal(isCampusRoute(url.pathname),true);
+    assert.equal(loginReturnTo(href),href);
+    assert.equal(url.searchParams.get('schoolRole'),scope==='school'?'teacher':null);
+    assert.equal(url.searchParams.get('schoolId'),scope==='school'?'joined-school':null);
+  }
 });

@@ -259,7 +259,7 @@ export function resourceArea(route) {
  if(/^\/assignments(?:\/|$)/.test(route))return 'assignments';
  if(/^\/(submissions|review-notebook)(?:\/|$)/.test(route))return 'submissions';
  if(/^\/(teaching|learning-paths|learning-resources|chapters|reports|timed-practices|points)(?:\/|$)/.test(route))return 'education';
- if(/^\/(profiles|profile-message-reports|student-notifications|staff-notifications|account-notifications)(?:\/|$)/.test(route))return 'community';
+ if(/^\/(homepages|profiles|profile-message-reports|student-notifications|staff-notifications|account-notifications)(?:\/|$)/.test(route))return 'community';
  if(/^\/(site-info|system-settings|audit-events|judge-status|judge-maintenance|judge-tasks)(?:\/|$)/.test(route))return 'system';
  return null;
 }

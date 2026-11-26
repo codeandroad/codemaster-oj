@@ -106,7 +106,8 @@ export function ProductionApp() {
 
   const loggedIn = (next: CampusUser) => {
     setUser(next);
-    const returnTo = pathname === "/login" ? loginReturnTo(search.get("returnTo")) : null;
+    const returnTo = pathname === "/login" ? loginReturnTo(search.get("returnTo"))
+      : pathname.startsWith("/people/") ? loginReturnTo(pathname + (search.size ? "?" + search : "")) : null;
     if (returnTo) {
       router.replace(returnTo);
       return;
@@ -167,6 +168,13 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
   user: CampusUser; pathname: string; search: URLSearchParams;
   onUserSaved: (user: CampusUser) => void; onLogout: () => void;
 }) {
+  if (pathname.startsWith("/people/")) {
+    const sharedAccount = pathname.slice("/people/".length).toLowerCase();
+    const props = {user, onUserSaved, onLogout, sharedAccount};
+    if (search.get("workspace") === "practice") return <LearnerWorkspace {...props} pathname={pathname}/>;
+    if (user.platformAdmin && search.get("workspace") !== "school") return <PlatformPage {...props}/>;
+    return <SchoolsPage {...props}/>;
+  }
   // Saved links to the former profile editor open the details on the owner's homepage.
   if ((pathname === "/platform" || pathname === "/schools") && search.get("section") === "profile") {
     const params = new URLSearchParams(search);

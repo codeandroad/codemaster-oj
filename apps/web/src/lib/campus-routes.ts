@@ -17,6 +17,7 @@ const availablePages = new Set([
 ]);
 
 const detailPages = [
+  /^\/people\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i,
   /^\/(student|teacher|admin)\/exam-preparation\/computer-science-9618(?:\/paper1)?$/,
   /^\/admin\/problems\/[^/]+\/edit$/,
   /^\/admin\/paper4\/[^/]+$/,
@@ -82,4 +83,13 @@ export function resolvePublicLearningBookmark(pathname: string, search: Pick<URL
     if (value) query.set(field, value);
   }
   return query.size ? `${base}?${query}` : base;
+}
+
+export function accountHomepageHref(accountId: string, workspace?: "school" | "practice" | "platform", schoolId?: string | null, role?: string) {
+  const path = `/people/${encodeURIComponent(accountId)}`;
+  if (!workspace) return path;
+  const query = new URLSearchParams({workspace});
+  if (workspace === "school" && schoolId) query.set("schoolId", schoolId);
+  if (workspace === "school" && role === "teacher") query.set("schoolRole", role);
+  return `${path}?${query}`;
 }

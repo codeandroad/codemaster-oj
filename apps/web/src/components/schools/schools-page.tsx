@@ -1,4 +1,5 @@
 "use client";
+import { accountHomepageHref } from "@/lib/campus-routes";
 
 import { AccountAccessAction } from "./account-access-action";
 
@@ -76,10 +77,12 @@ const teacherOnly = new Set<string>(workspaceNavigation.teacher
 teacherOnly.add("paper4");
 
 export function SchoolsPage({
+  sharedAccount,
   user,
   onLogout,
   onUserSaved,
 }: {
+  sharedAccount?: string;
   user: CampusUser;
   onLogout: () => void;
   onUserSaved: (user: CampusUser) => void;
@@ -109,8 +112,8 @@ export function SchoolsPage({
   const schoolName = selected
     ? schoolDisplayName(selected, locale)
     : text("School workspace", "学校工作区");
-  const requestedSection = search.get("section");
-  const ownHomepage = requestedSection === "me";
+  const requestedSection = sharedAccount ? "people" : search.get("section");
+  const ownHomepage = requestedSection === "me" || sharedAccount === user.id;
   const workspaceRole = schoolWorkspaceRole(selected?.roles ?? [], search.get("schoolRole"), requestedSection, teacherOnly);
   const admin = workspaceRole === "admin";
   const teaching = workspaceRole !== "student";
@@ -131,7 +134,8 @@ export function SchoolsPage({
   const navigationLabel = useWorkspaceNavigationLabel();
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
-    loaded && publicBookmark ? publicBookmark
+    sharedAccount ? null
+    : loaded && publicBookmark ? publicBookmark
     : loaded && !selected && ownHomepage && !lostSchool
       ? user.platformAdmin
         ? `/platform?section=me${search.get("details") === "1" ? "&details=1" : ""}`
@@ -180,8 +184,11 @@ export function SchoolsPage({
         </Loading>
       </main>
     );
+  if (!selected && sharedAccount) return <LearnerWorkspace sharedAccount={sharedAccount} pathname="/practice" user={user} onUserSaved={onUserSaved} onLogout={onLogout}/>;
+  if (!selected && sharedAccount) return <LearnerWorkspace pathname="/practice" sharedAccount={sharedAccount} user={user}
+    onUserSaved={onUserSaved} onLogout={onLogout}/>;
   if (!selected) return null;
-  if (!teaching) return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
+  if (!teaching) return <LearnerWorkspace key={selected.id} sharedAccount={sharedAccount} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
   const members = (
     <SchoolMembers
       school={selected}
@@ -226,12 +233,12 @@ export function SchoolsPage({
             schoolName={schoolName}
             navigation={
               <WorkspaceNavigation
-                items={sections.map(item => ({...item, href: href(item.section), active: !personalSettings && !ownHomepage && navigationSection === item.section}))}
+                items={sections.map(item => ({...item, href: href(item.section), active: !personalSettings && !ownHomepage && !sharedAccount && navigationSection === item.section}))}
               />
             }
             breadcrumb={
               <div className="flex min-w-0 items-center gap-2 text-sm">
-                {personalSettings || ownHomepage || active.section !== "home" ? (
+                {personalSettings || ownHomepage || sharedAccount || active.section !== "home" ? (
                   <>
                     <AppLink
                       href={href("home")}
@@ -257,7 +264,7 @@ export function SchoolsPage({
                     <span aria-hidden="true" className="hidden sm:block">›</span>
                   </>
                 )}
-                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : ownHomepage ? text("My homepage","我的主页") : navigationLabel(active)}
+                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : ownHomepage ? text("My homepage","我的主页") : sharedAccount ? text("Member profile","成员主页") : navigationLabel(active)}
                   parentHref={active.section === "classes" && search.has("classId") ? href("classes") : undefined}/>
 
               </div>
@@ -278,7 +285,7 @@ export function SchoolsPage({
                 workspace={teaching ? "staff" : "student"} role={workspaceRole} scholarshipHref={href("scholarship")}/>
               <AccountMenu
                 user={user}
-                homepageHref={href("me")}
+                homepageHref={accountHomepageHref(user.id,"school",selected.id,workspaceRole)}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
                 busy={logout.busy}
@@ -302,6 +309,8 @@ export function SchoolsPage({
                 onUserSaved={onUserSaved}
                 onSchoolsChanged={refresh}
               />
+            ) : sharedAccount && !ownHomepage ? (
+              <StudentPublicProfile key={sharedAccount} profileId={sharedAccount} preferredSchoolId={selected.id} viewer={user} workspace={workspaceRole}/>
             ) : ownHomepage ? (
               <StudentPublicProfile key={selected.id} profileId={selected.memberProfileId ?? user.id} schoolId={selected.id}
                 viewer={user} workspace={admin ? "admin" : "teacher"} schoolRoles={selected.roles}

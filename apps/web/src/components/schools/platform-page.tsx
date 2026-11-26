@@ -1,4 +1,5 @@
 "use client";
+import { accountHomepageHref } from "@/lib/campus-routes";
 
 import { CatalogGroups } from "./catalog-groups";
 import { RowActionButton } from "@/components/ui/row-action";
@@ -58,10 +59,12 @@ const platformSections = {
 type PlatformSection = keyof typeof platformSections;
 
 function PlatformAdminPage({
+  sharedAccount,
   user,
   onLogout,
   onUserSaved,
 }: {
+  sharedAccount?:string;
   user: CampusUser;
   onLogout: () => void;
   onUserSaved: (user: CampusUser) => void;
@@ -76,8 +79,8 @@ function PlatformAdminPage({
   const personalSettings = search.get("section") === "settings";
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const requestedSection = search.get("section") === "source-problems" ? "problems" : search.get("section") ?? "";
-  const ownHomepage = requestedSection === "me";
-  const personalTitle = ownHomepage ? text("My homepage", "我的主页") : personalSettings ? text("Settings", "设置") : null;
+  const ownHomepage = requestedSection === "me" || sharedAccount === user.id;
+  const personalTitle = ownHomepage ? text("My homepage", "我的主页") : sharedAccount ? text("Member profile","成员主页") : personalSettings ? text("Settings", "设置") : null;
   const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : user.platformAdmin ? "schools" : "courses";
   const profileId = section === "accounts" ? search.get("profileId") : null;
   const schoolId = search.get("schoolId");
@@ -118,7 +121,7 @@ function PlatformAdminPage({
               >
                 {(Object.keys(platformSections) as PlatformSection[]).map((item) => {
                   const { icon: Icon, en, zh } = platformSections[item];
-                  const active = !personalSettings && !ownHomepage && section === item;
+                  const active = !personalSettings && !ownHomepage && !sharedAccount && section === item;
                   return (
                     <Button
                       key={item}
@@ -157,7 +160,7 @@ function PlatformAdminPage({
               <NotificationDropdown key={user.id} workspace="platform"/>
               <AccountMenu
                 user={user}
-                homepageHref="/platform?section=me"
+                homepageHref={accountHomepageHref(user.id,"platform")} settingsHref="/platform?section=settings"
                 busy={logout.busy || action !== null}
                 onLogout={() =>
                   void logout.run(async () => {
@@ -175,6 +178,8 @@ function PlatformAdminPage({
             {ownHomepage ? (
               <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice"
                 onUserSaved={onUserSaved} detailsOpen={search.get("details") === "1"}/>
+            ) : sharedAccount ? (
+              <StudentPublicProfile profileId={sharedAccount} viewer={user} workspace="platform"/>
             ) : personalSettings ? (
               <PersonalWorkspaceSettings
                 user={user}
@@ -444,7 +449,7 @@ function SchoolList({
 }
 
 // Old delegated-workspace bookmarks return to the existing school authoring area.
-export function PlatformPage(props: { user: CampusUser; onLogout: () => void; onUserSaved: (user: CampusUser) => void }) {
+export function PlatformPage(props: { sharedAccount?:string; user: CampusUser; onLogout: () => void; onUserSaved: (user: CampusUser) => void }) {
   return props.user.platformAdmin ? <PlatformAdminPage {...props} /> : <SchoolAuthoringRedirect />;
 }
 function SchoolAuthoringRedirect() {

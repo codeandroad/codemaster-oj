@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { Heart, Quote, Smile, Trash2 } from "lucide-react";
+import { audienceName, type HomepageAudience } from "./homepage-audience";
+import { platformMemberProfileHref, schoolWorkspaceHref } from "../schools/school-workspace-location";
 import { AppLink } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
@@ -45,8 +47,8 @@ function QuotePreview({ nickname, body }: { nickname: string | null; body: strin
   </blockquote>;
 }
 
-function Composer({ base, quote, onSaved, onCancel }: {
-  base: string; quote?: Message; onSaved: () => void; onCancel?: () => void;
+function Composer({ base, quote, onSaved, onCancel, audience }: {
+  base: string; quote?: Message; audience: string; onSaved: () => void; onCancel?: () => void;
 }) {
   const { locale } = useLocale();
   const zh = locale === "zh";
@@ -123,9 +125,10 @@ function Composer({ base, quote, onSaved, onCancel }: {
     }}>
     {quote && <QuotePreview nickname={quote.author.nickname} body={quote.body}/>}
     <label id={`${id}-label`} htmlFor={id} className="block text-sm font-semibold">{title}</label>
+    <p id={`${id}-audience`} className="text-xs text-muted-foreground">{audience}</p>
     <div className="relative">
       <textarea ref={field} id={id} name="body" className={`mt-1.5 ${textarea}`} rows={quote ? 3 : 2} maxLength={limit} required
-        aria-describedby={`${id}-count ${id}-mention-hint`} value={draft} readOnly={post.busy}
+        aria-describedby={`${id}-audience ${id}-count ${id}-mention-hint`} value={draft} readOnly={post.busy}
         aria-autocomplete="list" aria-haspopup="listbox" aria-controls={active ? `${id}-mentions` : undefined}
         aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
         onChange={event => {
@@ -273,8 +276,8 @@ function Paging({ page, total, onChange }: { page: number; total: number; onChan
   </div>;
 }
 
-function Thread({ item, base, peoplePath, acceptingMessages, version, onDelete, changed }: {
-  item: Message; base: string; peoplePath: string; acceptingMessages: boolean; version: number;
+function Thread({ item, base, peoplePath, acceptingMessages, version, onDelete, changed, audience }: {
+  item: Message; base: string; peoplePath: string; acceptingMessages: boolean; version: number; audience: string;
   onDelete: (item: Message, trigger: HTMLButtonElement) => void; changed: () => void;
 }) {
   const { locale } = useLocale();
@@ -294,7 +297,7 @@ function Thread({ item, base, peoplePath, acceptingMessages, version, onDelete, 
     setQuote(null); returnFocus.current?.focus();
   }
   return <MessageRow {...{ item, base, peoplePath, onDelete }} onReply={acceptingMessages ? beginReply : undefined}>
-    {quote && acceptingMessages && <Composer key={quote.id} base={base} quote={quote} onCancel={endReply} onSaved={() => {
+    {quote && acceptingMessages && <Composer key={quote.id} base={base} audience={audience} quote={quote} onCancel={endReply} onSaved={() => {
       endReply(); setPage(1); setExpanded(true); changed();
     }}/>}
     {item.replyCount > 0 && <Button type="button" size="sm" variant="ghost" className="mt-1 px-2 text-primary" aria-expanded={expanded}
@@ -312,21 +315,38 @@ function Thread({ item, base, peoplePath, acceptingMessages, version, onDelete, 
   </MessageRow>;
 }
 
-export function ProfileGuestbook({ base, peoplePath, canPost, refreshVersion }: {
-  base: string; peoplePath: string; canPost: boolean; refreshVersion: number;
+interface HomepageMessages {
+  items: (Message & {book:string})[];
+  accepting: Record<string,boolean>;
+  total: number;
+  replyTotal: number;
+  next: string | null;
+  before: string | null;
+}
+
+export function ProfileGuestbook({ feed, query, books, workspace, refreshVersion }: {
+  feed: string; query:string; books:HomepageAudience[]; workspace?:string; refreshVersion: number;
 }) {
   const { locale } = useLocale();
   const zh = locale === "zh";
-  const [page, setPage] = useState(1);
+  const [cursors,setCursors] = useState<(string|null)[]>([null]);
+  const before = cursors.at(-1) ?? null;
   const [version, setVersion] = useState(0);
-  const [selected, setSelected] = useState<Message | null>(null);
+  const [selected, setSelected] = useState<(Message & {book:string}) | null>(null);
   const [notice, setNotice] = useState("");
   const target = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
-  const messages = useData<MessagesPage>(`${base}/messages?page=${page}&pageSize=${pageSize}`, version + refreshVersion);
-  const data = messages.data?.page === page ? messages.data : null;
-  const acceptingMessages = messages.data?.acceptingMessages === true;
+  const params = new URLSearchParams(query);
+  params.set("pageSize",String(pageSize));
+  if (before) params.set("before",before);
+  const messages = useData<HomepageMessages>(`${feed}?${params}`, version + refreshVersion);
+  const data = messages.data?.before === before && !messages.error ? messages.data : null;
+  const primary = books[0];
+  function audienceLabel(book:HomepageAudience) {
+    return book.schoolId ? (zh ? `校内可见 · ${audienceName(book,locale)}` : `Visible within ${audienceName(book,locale)} only`)
+      : (zh ? "对可访问此主页的登录用户可见" : "Visible to signed-in visitors with profile access");
+  }
   const deletion = useMutation();
   const changed = () => setVersion(current => current + 1);
   useEffect(() => {
@@ -339,17 +359,32 @@ export function ProfileGuestbook({ base, peoplePath, canPost, refreshVersion }: 
         : `${data.total} ${data.total === 1 ? "message" : "messages"} · ${data.replyTotal} ${data.replyTotal === 1 ? "reply" : "replies"}`}</span> : <span/>}
       <Button type="button" variant="ghost" size="sm" disabled={messages.loading} onClick={changed}>{zh ? "刷新留言" : "Refresh messages"}</Button>
     </div>
-    {messages.data?.acceptingMessages === false && <p className="mt-3 text-sm text-muted-foreground">{zh ? "已关闭新留言和回复。" : "New messages and replies are closed."}</p>}
-    {canPost && acceptingMessages && <Composer base={base} onSaved={() => { setPage(1); changed(); }}/>}
+    {data?.accepting[primary.base] === false && <p className="mt-3 text-sm text-muted-foreground">{zh ? "此范围已关闭新留言和回复。" : "New messages and replies are closed for this audience."}</p>}
+    {data?.accepting[primary.base] && <Composer base={primary.base} audience={audienceLabel(primary)} onSaved={() => { setCursors([null]); changed(); }}/>}
     {notice && <p role="status" className="mt-2 text-sm text-success">{notice}</p>}
     <State data={{ ...messages, data, loading: messages.loading || (!data && !messages.error) }}>
       {data?.items.length ? <ol className="mt-2 divide-y divide-border border-t border-border">
-        {data.items.map(item => <li key={item.id} className="py-3"><Thread {...{ item, base, peoplePath, acceptingMessages, changed }}
-          version={version + refreshVersion} onDelete={(message, trigger) => {
-            deletion.reset(); setNotice(""); target.current = trigger; setSelected(message);
-          }}/></li>)}
+        {data.items.map(item => {
+          const book = books.find(book=>book.base===item.book);
+          if (!book) return null;
+          const peoplePath = !book.schoolId ? "/people" : book.base.startsWith("platform/")
+            ? platformMemberProfileHref(book.schoolId,"")
+            : schoolWorkspaceHref(book.schoolId,"leaderboard",workspace==="teacher"?"teacher":undefined)+"&profileId=";
+          const audience = audienceLabel(book);
+          return <li key={item.id} className="py-3">
+            <p className="mb-1 text-xs text-muted-foreground">{audience}</p>
+            <Thread item={item} base={book.base} peoplePath={peoplePath} acceptingMessages={data.accepting[book.base]}
+              version={version + refreshVersion} changed={changed} audience={audience} onDelete={(message, trigger) => {
+                deletion.reset(); setNotice(""); target.current = trigger; setSelected({...message,book:book.base});
+              }}/>
+          </li>;
+        })}
       </ol> : <p className="mt-3 rounded-md bg-surface-subtle p-3 text-sm text-muted-foreground">{zh ? "还没有留言。" : "No messages yet."}</p>}
-      <Paging page={page} total={data?.total ?? 0} onChange={setPage}/>
+      {data && (cursors.length>1 || data.next) && <div className="mt-2 flex items-center gap-2 text-xs">
+        <span>{cursors.length} / {Math.max(cursors.length, Math.ceil(data.total/pageSize))}</span>
+        <Button variant="ghost" size="sm" disabled={cursors.length===1} onClick={()=>setCursors(c=>c.slice(0,-1))}>{zh ? "上一页" : "Previous"}</Button>
+        <Button variant="ghost" size="sm" disabled={!data.next} onClick={()=>{ if (data.next) setCursors([...cursors,data.next]); }}>{zh ? "下一页" : "Next"}</Button>
+      </div>}
     </State>
     <Dialog open={!!selected} onOpenChange={open => { if (!open && !deletion.busy) setSelected(null); }}>
       <DialogContent onOpenAutoFocus={event => { event.preventDefault(); cancel.current?.focus(); }}
@@ -364,8 +399,8 @@ export function ProfileGuestbook({ base, peoplePath, canPost, refreshVersion }: 
           <Button type="button" variant="destructive" disabled={deletion.busy || !selected} onClick={() => {
             if (!selected || deletion.busy) return;
             void deletion.run(async () => {
-              await productionApi(`${base}/messages/${selected.id}`, { method: "DELETE" });
-              if (!selected.threadId && data?.items.length === 1 && page > 1) setPage(page - 1);
+              await productionApi(`${selected.book}/messages/${selected.id}`, { method: "DELETE" });
+              if (!selected.threadId && data?.items.length === 1 && cursors.length > 1) setCursors(c=>c.slice(0,-1));
               target.current = null;
               setNotice(selected.threadId ? (zh ? "回复已删除。" : "Reply deleted.") : (zh ? "留言已删除。" : "Message deleted."));
               setSelected(null); changed();

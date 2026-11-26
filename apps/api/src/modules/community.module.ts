@@ -72,7 +72,7 @@ export class CommunityController {
  async dismissReport(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId','schools/:schoolId/profiles','schools/:schoolId/profiles/:identityId','practice/profiles/:accountId','platform/schools/:schoolId/profiles/:identityId'])
+ @Get(['homepages/:profileId','homepages/:profileId/messages','profiles/:identityId','schools/:schoolId/profiles','schools/:schoolId/profiles/:identityId','practice/profiles/:accountId','platform/schools/:schoolId/profiles/:identityId'])
  async profile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }

@@ -1,4 +1,5 @@
 "use client";
+import { accountHomepageHref } from "@/lib/campus-routes";
 
 import { useId } from "react";
 import { AppLink } from "../navigation";
@@ -16,9 +17,9 @@ export function GuestbookSettings({accountId}: {accountId: string}) {
   const description = useId();
   const settings = resource.data;
   const rows = [
-    {key:"schoolOpen", label:text("Allow new school profile messages and replies", "校内主页接受新留言和回复")},
-    {key:"practiceOpen", label:text("Allow new practice profile messages and replies", "公开练习主页接受新留言和回复")},
-    {key:"profileEnabled", label:text("Share my practice profile with signed-in users who have the link", "向持有链接的登录用户分享我的公开练习主页")},
+    {key:"schoolOpen", label:text("Allow school-only messages and replies", "接受校内留言和回复")},
+    {key:"practiceOpen", label:text("Allow public messages and replies", "接受公开留言和回复")},
+    {key:"profileEnabled", label:text("Share my homepage with signed-in visitors outside my school", "允许校外登录用户通过链接访问我的主页")},
   ] as const;
   return <section className={panel} aria-labelledby={description + "-heading"}>
     <h2 id={description + "-heading"} className="font-semibold">{text("Profile messages", "主页留言")}</h2>
@@ -39,7 +40,7 @@ export function GuestbookSettings({accountId}: {accountId: string}) {
         }}/>
         {label}
       </label>)}
-      {settings.profileEnabled && <AppLink className="inline-block text-sm font-semibold text-primary hover:underline" href={`/practice/people/${encodeURIComponent(accountId)}`}>{text("View public practice profile", "查看公开练习主页")}</AppLink>}
+      {settings.profileEnabled && <AppLink className="inline-block text-sm font-semibold text-primary hover:underline" href={accountHomepageHref(accountId)}>{text("Homepage link", "个人主页链接")}</AppLink>}
     </fieldset>}</State>
     <Feedback action={action}/>
   </section>;

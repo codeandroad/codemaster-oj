@@ -38,7 +38,13 @@ function fingerprintSql(plan) {
   const schoolJson = plan.updateDirectorySlug
     ? `(CASE WHEN t.id='${legacyId}' AND t.slug='legacy-school' THEN jsonb_set(${schoolFields},'{slug}',to_jsonb('tianxing-chuangshiji'::text)) ELSE ${schoolFields} END)`
     : schoolFields;
+  // Migration 167 adds a nullable target for account-based school guestbooks.
+  // A null target is equivalent to an absent field. Non-null targets and all
+  // other message fields remain included in every fingerprint.
+  const guestbookJson = `CASE WHEN to_jsonb(t)->'school_profile_account_id' = 'null'::jsonb
+    THEN to_jsonb(t) - 'school_profile_account_id' ELSE to_jsonb(t) END`;
   const expression = `CASE
+    WHEN tablename='student_guestbook_messages' THEN '${guestbookJson.replaceAll("'","''")}'
     ${plan.addGradingContext ? "WHEN tablename='school_activities' THEN 'to_jsonb(t) - ''required_language''' WHEN tablename='school_activity_problems' THEN 'to_jsonb(t) - ''prior_version_id'' - ''original_problem_version_id'' - ''original_prior_problem_version_id'''" : ''}
     ${plan.classifySnapshotBank ? `WHEN tablename='school_problem_banks' THEN 'CASE WHEN t.school_id=''${legacyId}'' AND t.id=''00000000-0000-4000-8000-000000000074'' AND t.request_id=t.id THEN to_jsonb(t) || jsonb_build_object(''resource_kind'',''publication''::text) ELSE to_jsonb(t) END'` : ''}
     ${plan.addSubmissionSchool ? "WHEN tablename='submissions' THEN 'to_jsonb(t) - ''school_id'''" : ''}

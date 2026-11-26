@@ -275,6 +275,9 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.deepEqual(ranking.own,{...before.data.own,rank:1,points:10,solved:1,attempts:2,acRate:0.5});
    assert.deepEqual(ranking.items.filter(row=>row.isOwn),[ranking.own]);
    assert.doesNotMatch(JSON.stringify(ranking),/Private Nickname|PRIVATE_LEADERBOARD_CODE|HIDDEN_LEADERBOARD_CASE|accountId|schoolId|problemId/);
+   const administratorRanking=(await request('/practice/leaderboard',{auth:auth.platform})).data;
+   assert.equal(administratorRanking.total,ranking.total);
+   assert.deepEqual(administratorRanking.items,ranking.items.map(row=>({...row,isOwn:false})));
 
    const inactive=(await request('/practice/leaderboard',{auth:auth.student})).data.own;
    assert.equal(inactive.rank,null);

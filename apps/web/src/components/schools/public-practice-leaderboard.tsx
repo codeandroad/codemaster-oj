@@ -35,7 +35,7 @@ type PublicRanking = {
 
 const visibleFields: VisibleFields = { online: true, solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: false };
 
-export function PublicPracticeLeaderboard() {
+export function PublicPracticeLeaderboard({ readOnly = false }: { readOnly?: boolean }) {
   const text = useSchoolText();
   const [page, setPage] = useState(1);
   const { version, refresh } = useRefreshOnReturn();
@@ -71,17 +71,17 @@ export function PublicPracticeLeaderboard() {
             `符合条件的题目每道首次通过得 ${rankNumber.format(ranking.data.pointsPerSolved)} 分。同分时按首解 AC 率排序。`,
           ) : title}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        {!readOnly && <div className="flex flex-wrap items-center gap-2">
           <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })} href="/practice/settings#public-practice">
             {text("Manage ranking", "管理排名")}
           </AppLink>
           <AppLink className={buttonVariants({ size: "sm" })} href="/practice/problems">
             {text("Practice problems", "去做题")}
           </AppLink>
-        </div>
+        </div>}
       </div>
 
-      {progress && own && (rankingOff || !progress.historyIncluded && progress.solved > own.solved) && (
+      {!readOnly && progress && own && (rankingOff || !progress.historyIncluded && progress.solved > own.solved) && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3">
           <p className="text-sm text-muted-foreground">{rankingOff
             ? text("Turn on public ranking to include eligible past submissions and show your entry on the leaderboard.", "开启公开排名后，符合条件的历史提交会计入排名，你的排名将显示在榜单上。")

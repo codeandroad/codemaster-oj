@@ -127,7 +127,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const keys=[await add('samples','sample A'),await add('samples','sample B'),await add('custom','custom'),await add('submit','formal')];
       const foreign=await add('samples','peer sample',users.peer.id);
       const change=(records,visibility,opts={})=>request(list,{...mine,method:'POST',body:{schoolId:recipient,date:day,records,visibility},...opts});
-      const adminCode=(key,status=200)=>request(history+'/PUB-'+key+q,{...adminB,status});
+      const adminCode=(key,status=200)=>request(history+'/'+encodeURIComponent('PUB-'+key)+q,{...adminB,status});
       const ownCode=list+'/'+keys[0].replace(':','/');
       assert.equal((await request(ownCode,mine)).data.code,'sample A');
       await request(ownCode,{auth:auth.peer,status:404});

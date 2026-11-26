@@ -453,7 +453,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  if(shared && (method==='GET' || method==='POST' && !shared[1]))
   return publicRunSharing({pool,user,url,method,body,detail:shared[1]?shared.slice(1):null});
  const history=route.match(/^\/schools\/([^/]+)\/submissions\/students\/([^/]+)(?:\/([^/]+))?$/);
- if(history && method==='GET')return studentJudgingHistory({pool,user,school:history[1],identity:history[2],record:history[3],url});
+ if(history && method==='GET')return studentJudgingHistory({pool,user,school:history[1],identity:history[2],record:history[3]?.replace(/%3a/i,':'),url});
  const isSubmission=method==='POST'&&/^\/practice\/problems\/[^/]+\/submissions$/.test(route);
  const courseContext=isSubmission?{courseId:body.courseId,chapterId:body.chapterId,versionId:body.versionId}
   :{courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};

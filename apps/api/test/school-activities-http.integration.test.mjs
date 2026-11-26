@@ -20,6 +20,13 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
   const pool = createPool(scoped.href); let server, worker;
   try {
     await owner.query('CREATE SCHEMA ' + schema); await migrate(pool);
+    // Independent deployments apply only migrations when upgrading an existing database.
+    const privileges = await pool.query(`SELECT
+      has_table_privilege('campus_app','school_public_run_shares','SELECT') AND
+      has_column_privilege('campus_app','school_public_run_shares','visibility','UPDATE') AND
+      NOT has_table_privilege('campus_app','school_public_run_shares','UPDATE') AND
+      NOT has_table_privilege('campus_worker','school_public_run_shares','SELECT') AS correct`);
+    assert.equal(privileges.rows[0].correct,true);
     const grantSql = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];
     await pool.query(grantSql.replaceAll('SCHEMA public', 'SCHEMA ' + schema));
     const password = randomBytes(24).toString('base64url'), hash = await hashPassword(password), users = {}, ids = {};

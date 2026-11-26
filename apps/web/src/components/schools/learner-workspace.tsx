@@ -60,7 +60,6 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const navigation = learnerNavigation(school?.id);
   const href = (key:string) => school ? schoolWorkspaceHref(school.id,key === "settings" ? "personal-settings" : key)
     : key === "home" ? "/practice" : `/practice/${key}`;
-  const homepageHref = school?.memberProfileId ? href("me") : "/practice/me";
   const scopeName = school ? schoolDisplayName(school,locale) : text("Open Platform","开放平台");
   const prep = ["paper4","acsl"].includes(section);
   const item = navigation.find(item=>item.section === section);
@@ -83,8 +82,8 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
       content = <div className="space-y-4">{!school && <PublicPracticePreferences/>}<PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved} onSchoolsChanged={onSchoolsChanged}/></div>;
       break;
     case "me":
-      content = <StudentPublicProfile key={school?.memberProfileId ?? user.id} onUserSaved={onUserSaved} schoolRoles={school?.roles} detailsOpen={search.get("details") === "1"}
-        profileId={school?.memberProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
+      content = <StudentPublicProfile onUserSaved={onUserSaved} schoolRoles={school?.roles} detailsOpen={search.get("details") === "1"}
+        profileId={school?.memberProfileId ?? school?.studentProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
       break;
     case "people":
     case "leaderboard":
@@ -148,7 +147,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
             navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section)}))}/>}
             account={<><ScholarshipBalance identityId={user.id} endpoint={wallet} href={href("scholarship")}/>
               <NotificationDropdown key={school?.id ?? "public"} workspace={school ? "student" : "public"} schoolId={school?.id} scholarshipHref={href("scholarship")}/>
-              <AccountMenu user={user} homepageHref={homepageHref} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
+              <AccountMenu user={user} homepageHref={href("me")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
                 onLogout={()=>void logout.run(async()=>{try {await productionApi("auth/logout",{method:"POST"});} catch(error) {if (!(error instanceof ApiError && error.status===401)) throw error;} onLogout();})}/>
             </>}>
             <Feedback action={logout}/><section key={`${school?.id ?? "public"}:${section}:${resourceId ?? ""}:${classId ?? ""}`} className="min-w-0">{content}</section>

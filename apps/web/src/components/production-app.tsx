@@ -172,7 +172,7 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
     const params = new URLSearchParams(search);
     params.set("section", "me");
     params.set("details", "1");
-    return <LearnerWorkspaceRedirect href={pathname === "/schools" ? `/schools?${params}` : "/practice/me?details=1"}/>;
+    return <LearnerWorkspaceRedirect href={`${pathname}?${params}`}/>;
   }
   if (pathname === "/practice/profile") return <LearnerWorkspaceRedirect href="/practice/me?details=1"/>;
   if (pathname === "/platform") return <PlatformPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
@@ -184,11 +184,10 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
     const [, scope, , resourceId] = pathname.split("/");
     const query = schoolBookmarkQuery(pathname,search,schoolId);
     const target = query.get("section")!;
-    if (target === "profile" && !schoolId) return <LearnerWorkspaceRedirect href="/practice/me?details=1"/>;
     if (schoolId && resourceId && scope === "student" && (target === "problems" || target === "courses")) {
       return <ResourceBookmark schoolId={schoolId} id={resourceId} section={target} query={query.toString()}/>;
     }
-    return <LearnerWorkspaceRedirect href={publicBookmark ?? (schoolId ? `/schools?${query}` : user.platformAdmin ? "/platform" : "/practice")}/>;
+    return <LearnerWorkspaceRedirect href={publicBookmark ?? (schoolId || target === "me" ? `/schools?${query}` : user.platformAdmin ? "/platform" : "/practice")}/>;
   }
 }
 

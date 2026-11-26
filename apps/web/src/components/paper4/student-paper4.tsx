@@ -374,7 +374,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
         <button type="button" className={styles.tool} title={tx("帮助与快捷键", "Help and shortcuts")} aria-label={tx("帮助与快捷键", "Help and shortcuts")} onClick={() => setHelpOpen(true)}><HelpCircle size={17}/></button>
         <ScholarshipBalance identityId={user.identityId}/>
         <NotificationDropdown/>
-        <AccountMenu user={user} role="student" busy={busy} onLogout={() => { if (dirty && !window.confirm(tx("代码仍有未保存修改，确定退出？", "There are unsaved edits. Sign out?"))) return; void mutate(async () => { try { await productionApi("auth/logout", { method: "POST" }); } catch (reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } clearProductionSession(); router.replace("/login"); }); }}/>
+        <AccountMenu user={user} role="student" homepageHref="/schools?section=me" busy={busy} onLogout={() => { if (dirty && !window.confirm(tx("代码仍有未保存修改，确定退出？", "There are unsaved edits. Sign out?"))) return; void mutate(async () => { try { await productionApi("auth/logout", { method: "POST" }); } catch (reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } clearProductionSession(); router.replace("/login"); }); }}/>
       </div>
     </header>
     <nav className={styles.mobileTabs} aria-label={tx("答题分区", "Workspace panels")}>{panelIds.map(panel => <button key={panel} type="button" aria-pressed={layout.mobilePanel === panel} onClick={() => dispatch({ type: "mobile", panel })}>{panel === "statement" ? tx("题目", "Problem") : panel === "editor" ? tx("代码", "Code") : tx("测试", "Tests")}</button>)}</nav>

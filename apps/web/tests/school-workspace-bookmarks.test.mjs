@@ -6,6 +6,7 @@ import {publicPracticeReturnHref} from '../src/components/schools/public-workspa
 test('saved school URLs retain the school, resource and authorized workspace action', () => {
   for (const [url, section, params] of [
     ['/admin/settings','system-settings',{}], ['/admin/accounts','members',{}],
+    ['/admin/profile','me',{schoolRole:'admin',details:'1'}], ['/teacher/profile','me',{schoolRole:'teacher',details:'1'}],
     ['/admin/people/id','leaderboard',{profileId:'id'}], ['/student/classes/id','classes',{classId:'id'}],
     ['/student/submissions/SUB1','submissions',{submissionId:'SUB1'}], ['/student/review-notebook/id','review-notebook',{reviewEntryId:'id'}],
     ['/teacher/problems/id/edit','problems',{problemEdit:'1',problemId:'id'}], ['/teacher/problems/solutions-review','scholarship',{}],

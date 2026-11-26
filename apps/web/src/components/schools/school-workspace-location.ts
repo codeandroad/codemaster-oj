@@ -35,11 +35,12 @@ export function schoolBookmarkQuery(pathname: string, search: URLSearchParams, s
   const sections: Record<string,string> = {
     "learning-paths":"courses", learning:"courses", "timed-practice":"timed", points:"leaderboard",
     people:id ? "leaderboard" : "identities", accounts:"members", "problem-banks":"problems",
-    "judge-service":"judge", settings:role === "admin" ? "system-settings" : "personal-settings",
+    "judge-service":"judge", profile:"me", settings:role === "admin" ? "system-settings" : "personal-settings",
   };
   const target = sections[section] ?? section;
   const query = new URLSearchParams(search);
   query.set("section",target);
+  if (section === "profile") query.set("details","1");
   if (schoolId) query.set("schoolId",schoolId);
   if (role === "student" || role === "teacher" || role === "admin") query.set("schoolRole",role);
   const keys:Record<string,string> = {courses:"courseId",problems:"problemId",classes:"classId",assignments:"activityId",

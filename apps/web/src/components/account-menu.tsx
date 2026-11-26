@@ -8,7 +8,7 @@ import {AppLink} from "@/components/navigation";
 import type {CampusUser,CampusRole} from "@/lib/production-api";
 import {useLocale} from "@/components/locale-context";
 
-export function AccountMenu({user,role,busy,onLogout,settingsHref,homepageHref = "/practice/me",leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;homepageHref?:string;leaderboardHref?:string}) {
+export function AccountMenu({user,role,busy,onLogout,settingsHref,homepageHref,leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;homepageHref:string;leaderboardHref?:string}) {
  const {t}=useLocale();
  const pathname=usePathname();
  const settingsPath=settingsHref??(pathname.startsWith("/platform")?"/platform?section=settings":pathname.startsWith("/schools")?"/schools?section=personal-settings":role==="admin"?"/admin/personal-settings":role?`/${role}/settings`:"/practice/settings");

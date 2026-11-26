@@ -132,7 +132,10 @@ export function SchoolsPage({
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
     loaded && publicBookmark ? publicBookmark
-    : loaded && ownHomepage && !selected?.memberProfileId ? (search.get("details") === "1" ? "/practice/me?details=1" : "/practice/me")
+    : loaded && !selected && ownHomepage && !lostSchool
+      ? user.platformAdmin
+        ? `/platform?section=me${search.get("details") === "1" ? "&details=1" : ""}`
+        : `/practice/me${search.get("details") === "1" ? "?details=1" : ""}`
     : loaded && user.platformAdmin && search.get("join") === "1"
       ? "/platform?section=settings#schools"
       : loaded && !selected
@@ -275,7 +278,7 @@ export function SchoolsPage({
                 workspace={teaching ? "staff" : "student"} role={workspaceRole} scholarshipHref={href("scholarship")}/>
               <AccountMenu
                 user={user}
-                homepageHref={selected.memberProfileId ? href("me") : undefined}
+                homepageHref={href("me")}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
                 busy={logout.busy}
@@ -299,8 +302,8 @@ export function SchoolsPage({
                 onUserSaved={onUserSaved}
                 onSchoolsChanged={refresh}
               />
-            ) : ownHomepage && selected.memberProfileId ? (
-              <StudentPublicProfile key={selected.memberProfileId} profileId={selected.memberProfileId} schoolId={selected.id}
+            ) : ownHomepage ? (
+              <StudentPublicProfile key={selected.id} profileId={selected.memberProfileId ?? user.id} schoolId={selected.id}
                 viewer={user} workspace={admin ? "admin" : "teacher"} schoolRoles={selected.roles}
                 onUserSaved={onUserSaved} detailsOpen={search.get("details") === "1"}/>
             ) : (

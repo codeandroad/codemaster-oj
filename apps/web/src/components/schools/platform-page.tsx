@@ -76,6 +76,8 @@ function PlatformAdminPage({
   const personalSettings = search.get("section") === "settings";
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const requestedSection = search.get("section") === "source-problems" ? "problems" : search.get("section") ?? "";
+  const ownHomepage = requestedSection === "me";
+  const personalTitle = ownHomepage ? text("My homepage", "我的主页") : personalSettings ? text("Settings", "设置") : null;
   const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : user.platformAdmin ? "schools" : "courses";
   const profileId = section === "accounts" ? search.get("profileId") : null;
   const schoolId = search.get("schoolId");
@@ -88,11 +90,9 @@ function PlatformAdminPage({
   const createTrigger = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const title = personalSettings
-        ? locale === "en" ? "Settings" : "设置"
-        : locale === "en" ? "Platform administration" : "平台管理";
+    const title = personalTitle ?? (locale === "en" ? "Platform administration" : "平台管理");
     document.title = `${title} · CodeMaster`;
-  }, [locale, personalSettings]);
+  }, [locale, personalTitle]);
 
   function openAction(next: PlatformSchoolAction, trigger: HTMLButtonElement) {
     lastTrigger.current = trigger;
@@ -118,17 +118,14 @@ function PlatformAdminPage({
               >
                 {(Object.keys(platformSections) as PlatformSection[]).map((item) => {
                   const { icon: Icon, en, zh } = platformSections[item];
+                  const active = !personalSettings && !ownHomepage && section === item;
                   return (
                     <Button
                       key={item}
                       variant="ghost"
                       disabled={action !== null}
-                      className={`min-h-10 w-full justify-start gap-3 px-3 text-sm ${!personalSettings && section === item ? "bg-accent font-semibold" : "text-muted-foreground"}`}
-                      aria-current={
-                        !personalSettings && section === item
-                          ? "page"
-                          : undefined
-                      }
+                      className={`min-h-10 w-full justify-start gap-3 px-3 text-sm ${active ? "bg-accent font-semibold" : "text-muted-foreground"}`}
+                      aria-current={active ? "page" : undefined}
                       onClick={() => {
                         setSection(item);
                         setMessage("");
@@ -152,9 +149,7 @@ function PlatformAdminPage({
                   <span aria-hidden="true">›</span>
                 </>}
                 <h1 className="truncate font-semibold">
-                  {personalSettings
-                    ? text("Settings", "设置")
-                    : profileId && schoolId ? text("Member profile", "成员主页") : text(platformSections[section].en, platformSections[section].zh)}
+                  {personalTitle ?? (profileId && schoolId ? text("Member profile", "成员主页") : text(platformSections[section].en, platformSections[section].zh))}
                 </h1>
               </div>
             }
@@ -162,6 +157,7 @@ function PlatformAdminPage({
               <NotificationDropdown key={user.id} workspace="platform"/>
               <AccountMenu
                 user={user}
+                homepageHref="/platform?section=me"
                 busy={logout.busy || action !== null}
                 onLogout={() =>
                   void logout.run(async () => {
@@ -176,7 +172,10 @@ function PlatformAdminPage({
               />
             </div>}
           >
-            {personalSettings ? (
+            {ownHomepage ? (
+              <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice"
+                onUserSaved={onUserSaved} detailsOpen={search.get("details") === "1"}/>
+            ) : personalSettings ? (
               <PersonalWorkspaceSettings
                 user={user}
                 onUserSaved={onUserSaved}

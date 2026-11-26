@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
 import { useLocale } from "@/components/locale-context";
 import { ScholarshipBalance } from "@/components/scholarship/account-pages";
@@ -13,7 +13,8 @@ export function ProblemWorkspaceAccount({ user, schoolId, dirty, staff = false, 
   user: CampusUser; schoolId?: string | null; dirty: boolean; staff?: boolean; publicWallet?: boolean;
 }) {
   const action = useMutation(), router = useRouter(), { locale } = useLocale();
-  const href = (section: string) => schoolId ? schoolWorkspaceHref(schoolId, section) : `/practice/${section}`;
+  const schoolRole = useSearchParams().get("schoolRole") === "teacher" ? "teacher" : undefined;
+  const href = (section: string) => schoolId ? schoolWorkspaceHref(schoolId, section, schoolRole) : `/practice/${section}`;
   const wallet = schoolId && !publicWallet ? `schools/${schoolId}/scholarship/me` as const : "practice/scholarship/me";
   return <>
     {!staff && <ScholarshipBalance identityId={user.id} endpoint={wallet} href={publicWallet ? "/practice/scholarship" : href("scholarship")}/>}

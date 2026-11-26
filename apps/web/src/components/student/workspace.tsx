@@ -438,7 +438,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
         <button type="button" aria-label={tx("工作区设置","Workspace settings")} title={tx("工作区设置","Workspace settings")} className={styles.tool} onClick={() => {setSettingsScope("workspace");setSettingsOpen(true);}} data-od-id="workspace-settings"><Settings size={18} strokeWidth={1.7}/></button>
         <button type="button" aria-label={tx("帮助与快捷键","Help and shortcuts")} title={tx("帮助与快捷键","Help and shortcuts")} className={styles.tool} onClick={() => setConfirm("help")}><HelpCircle size={17}/></button>
         {adapter ? adapter.account(anyDirty) : <><ScholarshipBalance identityId={user.identityId}/><NotificationDropdown/>
-        <AccountMenu user={user} role="student" busy={action.busy} onLogout={()=>{if(anyDirty&&!window.confirm(tx("代码尚未提交，草稿保留在本机。确认退出登录？","Your code has not been submitted. The draft remains in this browser. Sign out?")))return;void action.run(async()=>{try{await productionApi("auth/logout",{method:"POST"});}catch(e){if(!(e instanceof ApiError&&e.status===401))throw e;}clearProductionSession();router.replace("/login");});}}/></>}
+        <AccountMenu user={user} role="student" homepageHref="/schools?section=me" busy={action.busy} onLogout={()=>{if(anyDirty&&!window.confirm(tx("代码尚未提交，草稿保留在本机。确认退出登录？","Your code has not been submitted. The draft remains in this browser. Sign out?")))return;void action.run(async()=>{try{await productionApi("auth/logout",{method:"POST"});}catch(e){if(!(e instanceof ApiError&&e.status===401))throw e;}clearProductionSession();router.replace("/login");});}}/></>}
       </div>
     </header>
     {adapter?.statusBanner}

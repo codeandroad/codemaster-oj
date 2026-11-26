@@ -92,10 +92,12 @@ export function SchoolAccountDetails({ school, accountId, onClose, onIdentitySav
         <Button size="sm" variant="secondary" onClick={() => setEditing("profile")}>{text("Edit profile", "编辑资料")}</Button>
         <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"identities")+"&identityId="+member.identityId}>
           {text("Open school identity", "查看校内身份档案")}</AppLink>
-        {member.role === "student" && !member.disabled && !member.suspended &&
-          <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+member.identityId}>
-            {text("View student profile", "查看学生主页")}</AppLink>}
       </div>}
+      {!member.disabled && !member.suspended &&
+        <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+
+          (member.role === "student" ? member.identityId ?? member.accountId : member.accountId)}>
+          {member.role === "student" ? text("View student profile", "查看学生主页") : text("View profile", "查看主页")}
+        </AppLink>}
       <section><h3 className="mb-2 text-sm font-semibold">{text("Recent account changes", "近期账号管理记录")}</h3>
         <ul className="space-y-1 text-sm">{member.events.map((event, index) => <li key={index}>
           {new Date(event.createdAt).toLocaleString()} · {({

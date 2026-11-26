@@ -12,9 +12,10 @@ async function inboxRecipient(db, { user, notificationSchoolId: requestedSchool 
   await lockSchoolTeaching(db, schoolId, { shared:true });
   const role = await schoolRole(db, schoolId, user.id);
   if (role !== 'school_admin' && role !== 'teacher') fail(403, 'FORBIDDEN', '需要教师或本校管理员权限');
+  await db.query(`SELECT set_config('campus.school_id',$1,true),
+    set_config('campus.notification_school_id',$1,true)`, [schoolId]);
   if (role === 'school_admin') {
-    await db.query(`SELECT set_config('campus.school_id',$1,true),
-      set_config('campus.course_admission_school_id',$1,true),
+    await db.query(`SELECT set_config('campus.course_admission_school_id',$1,true),
       set_config('campus.staff_notification_account_id',$2,true)`, [schoolId, user.id]);
   }
   await setAccountNotificationRecipient(db, user.id);
@@ -43,7 +44,7 @@ export function listStaffCourseNotifications(ctx, { page, pageSize }) {
         ON r.school_id=$1 AND r.account_id=$2 AND r.application_id=a.id
       WHERE $5::boolean
       UNION ALL ${courseAdmissionNotificationRows}
-      ${ctx.notificationSchoolId ? '' : `UNION ALL ${guestbookNotificationRows(false)}`}
+      UNION ALL ${guestbookNotificationRows(false)}
     )
     SELECT totals.total, totals.unread, items.*
     FROM (
@@ -80,10 +81,8 @@ export function markStaffCourseNotificationsRead(ctx, notificationId = null) {
     }
     const decision = await readCourseAdmissionNotification(db, notificationId);
     if (notificationId && decision) return response({ ok: true, readAt: decision.read_at });
-    if (!ctx.notificationSchoolId) {
-      const guestbook = await readGuestbookNotification(db, notificationId, false);
-      if (notificationId && guestbook) return response({ ok: true, readAt: guestbook.read_at });
-    }
+    const guestbook = await readGuestbookNotification(db, notificationId, false);
+    if (notificationId && guestbook) return response({ ok: true, readAt: guestbook.read_at });
     if (notificationId) fail(404, 'NOT_FOUND', '通知不存在');
     return response({ ok: true });
   });

@@ -167,7 +167,7 @@ export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: 
 }) {
   const text = useSchoolText(), t = useAdminText();
   const base = `schools/${school.id}`;
-  const details = useData<DirectoryIdentity & { hasStudentProfile: boolean }>(`${base}/identities/${identityId}/details`);
+  const details = useData<DirectoryIdentity & { memberProfileId: string | null }>(`${base}/identities/${identityId}/details`);
   const person = details.data;
   const [action, setAction] = useState<"classes" | "profile" | "link" | "unlink" | null>(null);
   function saved(message: string) {
@@ -179,19 +179,17 @@ export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: 
       {!action && <Drawer title={person?.name ?? text("Identity details","身份详情")}
         eyebrow={person?.number} onClose={onClose}>
         <Loading resource={details}>{person && <div className="space-y-4 text-sm">
-          {person.kind === "student" && (
-            person.hasStudentProfile ? (
+          {person.memberProfileId ? (
               <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })}
-                href={schoolWorkspaceHref(school.id, "leaderboard") + "&profileId=" + person.id}>
-                {text("View student profile", "查看学生主页")}
+                href={schoolWorkspaceHref(school.id, "leaderboard") + "&profileId=" + person.memberProfileId}>
+                {person.kind === "student" ? text("View student profile", "查看学生主页") : text("View profile", "查看主页")}
               </AppLink>
-            ) : (
+            ) : person.kind === "student" && (
               <p className="text-muted-foreground">{person.archivedAt
                 ? text("The student profile is unavailable because this identity is archived.", "该身份档案已归档，学生主页不可访问。")
                 : person.accountId
                   ? text("The student profile is unavailable because the linked account or its school access is inactive.", "关联账号或本校访问已停用，学生主页不可访问。")
                   : text("The student profile will be available after this identity is linked to an active account.", "此档案关联有效账号后，即可查看学生主页。")}</p>
-            )
           )}
           <section className="space-y-3 rounded-md border border-border p-4">
             <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{text("Identity details","身份资料")}</h3>

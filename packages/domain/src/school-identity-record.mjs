@@ -3,13 +3,6 @@ import { auditSchool } from './schools.mjs';
 
 export const identityFields = 'id, kind, number, name, account_id AS "accountId", created_at AS "createdAt"';
 
-export const activeStudentProfileRows = `FROM school_identities i
-  JOIN accounts a ON a.id=i.account_id
-  JOIN school_memberships m ON (m.school_id,m.account_id)=(i.school_id,a.id)
-    AND m.role='student' AND m.revoked_at IS NULL
-  WHERE i.kind='student' AND i.archived_at IS NULL
-    AND a.disabled_at IS NULL AND a.binding_released_at IS NULL`;
-
 export const identityClasses = `(SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name,
   'archived', c.archived_at IS NOT NULL) ORDER BY c.name, c.id), '[]') FROM school_class_roster r
   JOIN school_classes c ON c.school_id = r.school_id AND c.id = r.class_id

@@ -245,7 +245,9 @@ test('explicit platform governance preserves teaching roles and enforces authori
           assert.equal(read.status,200,suffix);
           if (suffix==='/messages') assert.equal(read.data.items[0].id,note.data.id);
         }
-        assert.equal((await post(preview+'/messages',platform,{body:'Read only'})).status,404);
+        const staffNote = await post(preview+'/messages',platform,{body:'Message from platform administration'});
+        assert.equal(staffNote.status,201);
+        assert.equal((await request(schoolProfile+'/messages',{auth:learner})).data.items[0].id,staffNote.data.id);
         assert.equal((await request(`/platform/schools/${originalSchool.id}/profiles/${identity.id}`,{auth:platform})).status,404);
         const wallet = await request(`${prefix}/scholarship/wallet`, { auth: learner });
         assert.equal(wallet.status, 200);

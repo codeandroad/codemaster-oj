@@ -12,8 +12,7 @@ import { ProfileDetails, ProfileEditor } from "../profile-editor";
 import { ProfileCoverEditor } from "../profile-cover-editor";
 import type { SchoolRole } from "../schools/school-ui";
 import { ProfileGuestbook } from "./profile-guestbook";
-import { RecentSubmissions, useLearnerSubmissions } from "./recent-submissions";
-import { platformStudentProfileHref } from "../schools/school-workspace-location";
+import { platformMemberProfileHref, schoolWorkspaceHref } from "../schools/school-workspace-location";
 
 interface PublicProfile {
   nickname: string;
@@ -64,11 +63,6 @@ function ProfileMessagesPanel({ children }: { children: ReactNode }) {
   </section>;
 }
 
-function OwnRecentSubmissions({ schoolId, version }: { schoolId?: string; version: number }) {
-  const submissions = useLearnerSubmissions(schoolId, version);
-  return <RecentSubmissions {...submissions}/>;
-}
-
 export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, onUserSaved, schoolRoles, detailsOpen, workspace = "student", schoolId }: {
   judgingHistoryHref?: string; schoolId?: string; profileId: string; viewer: CampusUser;
   onUserSaved?: (next: CampusUser) => void; schoolRoles?: SchoolRole[]; detailsOpen?: boolean;
@@ -77,17 +71,18 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
   const ownPage = Boolean(onUserSaved);
   const { locale } = useLocale();
   const practice = workspace === "practice";
-  const showActivity = !practice || ownPage;
   const preview = workspace === "platform";
   const schoolScope = schoolId ? `schools/${encodeURIComponent(schoolId)}/` : "";
   const base = `${practice ? "practice/" : preview ? "platform/" + schoolScope : schoolScope}profiles/${encodeURIComponent(profileId)}`;
-  const peoplePath = preview && schoolId ? platformStudentProfileHref(schoolId, "") : schoolId
-    ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`;
+  const peoplePath = preview && schoolId ? platformMemberProfileHref(schoolId, "") : schoolId
+    ? schoolWorkspaceHref(schoolId, "leaderboard", workspace === "teacher" ? "teacher" : undefined) + "&profileId="
+    : `/${workspace}/people`;
   const { version, refresh } = useRefreshOnReturn();
   const profile = useData<{ profile: PublicProfile }>(base, version);
   const [activityPage, setActivityPage] = useState(1);
-  const activity = useData<Page<ProfileActivity>>(showActivity ? `${base}/activity?page=${activityPage}&pageSize=${pageSize}` : "", version);
   const person = profile.data?.profile;
+  const showActivity = practice ? ownPage : person?.points !== undefined;
+  const activity = useData<Page<ProfileActivity>>(showActivity ? `${base}/activity?page=${activityPage}&pageSize=${pageSize}` : "", version);
   const editButton = useRef<HTMLButtonElement>(null);
   const [editState, setEditState] = useState<"view" | "editing" | "saved">("view");
   const editing = editState === "editing";
@@ -98,7 +93,7 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
   const hero = ownPage && practice && person?.isSelf
     ? { avatar: viewer.avatar, nickname: viewer.nickname || viewer.name, bio: viewer.bio }
     : person;
-  const canWrite = practice || workspace === "student" && (Boolean(schoolId) || viewer.roles.includes("student"));
+  const canWrite = practice || Boolean(schoolId);
   const stats = person?.points !== undefined && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
     <div><dt className="text-xs text-muted-foreground">{practice ? ui(locale, "排名积分", "Ranking points") : ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
     {person.scholarship !== undefined && <div><dt className="text-xs text-muted-foreground">{ui(locale, "奖学金", "Scholarship")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.scholarship}</dd></div>}
@@ -111,11 +106,11 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
       <Pencil size={15} aria-hidden="true"/>{ui(locale, "编辑个人资料", "Edit profile")}
     </Button>;
   } else if (person?.isSelf && !ownPage) {
-    profileAction = <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=me&details=1` : "/practice/me?details=1"}
+    profileAction = <AppLink href={schoolId ? schoolWorkspaceHref(schoolId, "me", workspace === "teacher" ? "teacher" : undefined) + "&details=1" : "/practice/me?details=1"}
       className={buttonVariants({variant:"outline"})}>{ui(locale, "个人资料", "Profile details")}</AppLink>;
   }
   return <div className="space-y-5">
-    {!ownPage && <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>}
+    {!ownPage && <h1 className="sr-only">{ui(locale, "个人主页", "Profile")}</h1>}
     <State data={profile}>
       {person && hero && <ProfileHero avatar={hero.avatar} nickname={hero.nickname} bio={hero.bio}
         presenceEndpoint={practice ? "practice/presence" : undefined}
@@ -129,13 +124,13 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
           {editState === "saved" && <p role="status" className="mt-3 text-sm text-success">{ui(locale, "个人资料已保存。", "Profile saved.")}</p>}
         </>}
         {(!practice || ownPage) && stats}
-        {judgingHistoryHref && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
+        {judgingHistoryHref && showActivity && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
       </ProfileHero>}
     </State>
 
     {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
       <ProfileMessagesPanel>
-        <ProfileGuestbook key={base} base={base} peoplePath={peoplePath} readOnly={preview} canPost={canWrite} refreshVersion={version}/>
+        <ProfileGuestbook key={base} base={base} peoplePath={peoplePath} canPost={canWrite} refreshVersion={version}/>
       </ProfileMessagesPanel>
 
       {showActivity && <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">
@@ -152,6 +147,5 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
       </section>}
 
     </div>}
-    {ownPage && person?.isSelf && <OwnRecentSubmissions schoolId={schoolId} version={version}/>}
   </div>;
 }

@@ -428,7 +428,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
         const record=api+'/'+person.id;
         const before=await get(record+'/details');
         assert.equal(before.canArchive,true);
-        assert.equal(before.hasStudentProfile,false);
+        assert.equal(before.memberProfileId,null);
         const options=await get(api+'?view=filters');
         assert.ok(options.counts.student>0);
         assert.ok(options.classes.some(c=>c.id===taughtClass.id));
@@ -442,12 +442,12 @@ test('school directories and class rosters enforce tenant, role, and account bou
         const claimed=await get(studentDetails);
         assert.equal(claimed.username,'pilot-student');
         assert.equal(claimed.canArchive,false);
-        assert.equal(claimed.hasStudentProfile,true);
+        assert.equal(claimed.memberProfileId,alphaStudent.id);
         assert.equal((await get(profilePath)).profile.id,alphaStudent.id);
-        assert.equal((await get(api+'/'+alphaTeacher.id+'/details')).hasStudentProfile,false);
+        assert.equal((await get(api+'/'+alphaTeacher.id+'/details')).memberProfileId,teacher.id);
         await pool.query('UPDATE accounts SET disabled_at=now() WHERE id=$1',[student.id]);
         try {
-          assert.equal((await get(studentDetails)).hasStudentProfile,false);
+          assert.equal((await get(studentDetails)).memberProfileId,null);
           await request(profilePath,{auth:alphaAdmin,status:404});
         } finally {
           await pool.query('UPDATE accounts SET disabled_at=NULL WHERE id=$1',[student.id]);
@@ -458,7 +458,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
         }
         await post(record+'/activation-code',alphaAdmin,{});
         await post(record+'/archive',alphaAdmin,{},200);
-        assert.equal((await get(record+'/details')).hasStudentProfile,false);
+        assert.equal((await get(record+'/details')).memberProfileId,null);
         await post(record+'/activation-code',alphaAdmin,{},404);
         assert.equal((await get(api+'?q=PENDING-42')).items.length,0);
         const retired=(await get(api+'?q=PENDING-42&archived=true')).items;
@@ -470,10 +470,10 @@ test('school directories and class rosters enforce tenant, role, and account bou
         assert.equal((await pool.query('SELECT expires_at<=now() expired FROM school_activation_tokens WHERE identity_id=$1',[person.id])).rows[0].expired,true);
         await post(api+'/'+alphaStudent.id+'/archive',alphaAdmin,{},409);
         await patch(bind(alpha,alphaStudent),alphaAdmin,{accountId:null,expectedAccountId:student.id});
-        assert.equal((await get(studentDetails)).hasStudentProfile,false);
+        assert.equal((await get(studentDetails)).memberProfileId,null);
         await post(api+'/'+alphaStudent.id+'/archive',alphaAdmin,{},409);
         await patch(bind(alpha,alphaStudent),alphaAdmin,{accountId:student.id});
-        assert.equal((await get(studentDetails)).hasStudentProfile,true);
+        assert.equal((await get(studentDetails)).memberProfileId,alphaStudent.id);
       });
 
       await t.test('profile edits stay school-scoped and preserve the linked account and roster', async () => {

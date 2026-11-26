@@ -9,6 +9,7 @@ import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi } from "@/lib/production-api";
 import { date, useData } from "./data-state";
 import { notificationFeed, notificationTabs, type Notification, type NotificationTab } from "./notification-feed";
+import { schoolWorkspaceHref } from "../schools/school-workspace-location";
 
 interface NotificationPage {
   items: Notification[];
@@ -39,7 +40,11 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
           : item.interaction === "reply"
             ? ui(locale, `${item.authorNickname} 回复了主页留言`, `${item.authorNickname} replied to a profile message`)
             : ui(locale, `${item.authorNickname} 给你的主页留言`, `${item.authorNickname} left a message on your profile`),
-        body: item.body, href: `/${item.practice ? "practice" : role}/people/${encodeURIComponent(item.profileIdentityId)}?from=profile#profile-guestbook`, icon: MessageCircle,
+        body: item.body,
+        href: !item.practice && schoolId
+          ? `${schoolWorkspaceHref(schoolId, "leaderboard", role)}&profileId=${encodeURIComponent(item.profileIdentityId)}#profile-guestbook`
+          : `/${item.practice ? "practice" : role}/people/${encodeURIComponent(item.profileIdentityId)}?from=profile#profile-guestbook`,
+        icon: MessageCircle,
       };
     case "teacher_feedback":
       return {

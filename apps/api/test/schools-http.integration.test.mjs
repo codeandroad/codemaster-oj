@@ -437,6 +437,73 @@ test('school claims and reviewed applications stay within each school on the rea
         assert.equal((await share(false)).status,200);
       });
 
+      await t.test('eligible school members and platform administrators can leave messages on school profiles', async () => {
+        const school = '/schools/'+alpha.id;
+        const settings = '/account/guestbook-settings';
+        const teacher = await request('/auth/login',{method:'POST',body:{username:'staff-placement',password}});
+        assert.equal(teacher.status,200);
+        const pupil = await registerPersonal(request,'guestbook-pupil',password);
+        const administrator = await registerPersonal(request,'guestbook-admin',password);
+        await seedUnlinkedMembership(pool,alpha.id,pupil.data.user.id,'student');
+        await seedUnlinkedMembership(pool,alpha.id,administrator.data.user.id,'school_admin');
+        const teacherId = teacher.data.user.id, administratorId = administrator.data.user.id;
+        const teacherBook = school+'/profiles/'+teacherId+'/messages';
+        const adminBook = school+'/profiles/'+administratorId+'/messages';
+        const studentBook = school+'/profiles/'+local.id+'/messages';
+        const directory = (await request(school+'/profiles?pageSize=50',{auth:pupil})).data.items;
+        assert.ok(directory.some(row=>row.id===teacherId && row.role==='teacher'));
+        assert.ok(directory.some(row=>row.id===administratorId && row.role==='school_admin'));
+        assert.ok(directory.every(row=>Object.keys(row).length===4));
+        assert.equal((await request('/schools',{auth:teacher})).data.items[0].memberProfileId,teacherId);
+        assert.equal((await request(school+'/profiles/'+administratorId,{auth:administrator})).data.profile.isSelf,true);
+
+        const messages = [];
+        for (const [book,author] of [[teacherBook,pupil],[adminBook,teacher],[studentBook,administrator],['/platform'+teacherBook,platform]]) {
+          const result = await post(book,author,{body:'School member message'});
+          assert.equal(result.status,201,JSON.stringify(result.data.error));
+          messages.push(result.data.id);
+        }
+        const [studentMessage,,,platformMessage] = messages;
+        assert.equal((await post('/platform'+teacherBook,pupil,{body:'Forbidden'})).status,403);
+        assert.equal((await post('/platform'+teacherBook,platform,{body:'Missing CSRF'},false)).status,403);
+        assert.equal((await post(teacherBook,betaAdmin,{body:'Foreign school'})).status,404);
+        assert.equal((await post('/platform/schools/'+beta.id+'/profiles/'+teacherId+'/messages',platform,{body:'Foreign target'})).status,404);
+        assert.equal((await request('/platform'+teacherBook+'/'+studentMessage,{method:'DELETE',auth:platform})).status,403);
+
+        const inbox = (await request(school+'/staff-notifications',{auth:teacher})).data.items.filter(item=>item.kind==='guestbook');
+        assert.equal(inbox.length,2);
+        assert.ok(inbox.every(item=>item.profileIdentityId===teacherId));
+        assert.equal((await post(school+'/staff-notifications/'+inbox[0].id+'/read',teacher,{})).status,200);
+
+        assert.equal((await request(settings,{method:'PATCH',auth:teacher,body:{scope:'school',open:false}})).status,200);
+        for (const [book,author] of [[teacherBook,administrator],['/platform'+teacherBook,platform]]) {
+          for (const quoteId of [null,studentMessage]) {
+            const denied = await post(book,author,{body:'Closed',quoteId});
+            assert.equal(denied.data.error.code,'GUESTBOOK_CLOSED');
+          }
+          const visible = (await request(book,{auth:author})).data;
+          assert.equal(visible.acceptingMessages,false);
+          assert.deepEqual(new Set(visible.items.map(item=>item.id)),new Set([studentMessage,platformMessage]));
+        }
+        assert.equal((await request('/platform'+teacherBook+'/'+platformMessage,{method:'DELETE',auth:platform})).status,200);
+        assert.equal((await request(studentBook+'/'+messages[2],{method:'DELETE',auth:administrator})).status,200);
+        assert.equal((await request(settings,{method:'PATCH',auth:teacher,body:{scope:'school',open:true}})).status,200);
+
+        const extra = await registerPersonal(request,'guestbook-colleague',password);
+        await seedUnlinkedMembership(pool,alpha.id,extra.data.user.id,'teacher');
+        const unlinkedBook = school+'/profiles/'+pupil.data.user.id+'/messages';
+        const priorMessage = await post(unlinkedBook,extra,{body:'Written before linking a student record'});
+        assert.equal(priorMessage.status,201);
+        const claimed = await make(alpha,alphaAdmin,{kind:'student',number:'G001',name:'Guestbook learner',accountId:pupil.data.user.id});
+        assert.ok(claimed.id);
+        const linkedBook = school+'/profiles/'+claimed.id+'/messages';
+        for (const book of [unlinkedBook,linkedBook]) {
+          const result = await request(book,{auth:pupil});
+          assert.equal(result.status,200);
+          assert.deepEqual(result.data.items.map(item=>item.id),[priorMessage.data.id]);
+        }
+      });
+
       await t.test('closing either guestbook preserves its threads and independently blocks new messages and replies', async () => {
         const settings = '/account/guestbook-settings';
         const schoolBook = '/schools/'+alpha.id+'/profiles/'+local.id+'/messages';

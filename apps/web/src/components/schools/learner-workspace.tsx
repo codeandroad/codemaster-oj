@@ -60,7 +60,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const navigation = learnerNavigation(school?.id);
   const href = (key:string) => school ? schoolWorkspaceHref(school.id,key === "settings" ? "personal-settings" : key)
     : key === "home" ? "/practice" : `/practice/${key}`;
-  const homepageHref = school?.studentProfileId ? href("me") : "/practice/me";
+  const homepageHref = school?.memberProfileId ? href("me") : "/practice/me";
   const scopeName = school ? schoolDisplayName(school,locale) : text("Open Platform","开放平台");
   const prep = ["paper4","acsl"].includes(section);
   const item = navigation.find(item=>item.section === section);
@@ -83,8 +83,8 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
       content = <div className="space-y-4">{!school && <PublicPracticePreferences/>}<PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved} onSchoolsChanged={onSchoolsChanged}/></div>;
       break;
     case "me":
-      content = <StudentPublicProfile key={school?.studentProfileId ?? user.id} onUserSaved={onUserSaved} schoolRoles={school?.roles} detailsOpen={search.get("details") === "1"}
-        profileId={school?.studentProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
+      content = <StudentPublicProfile key={school?.memberProfileId ?? user.id} onUserSaved={onUserSaved} schoolRoles={school?.roles} detailsOpen={search.get("details") === "1"}
+        profileId={school?.memberProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
       break;
     case "people":
     case "leaderboard":

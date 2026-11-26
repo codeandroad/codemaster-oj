@@ -208,8 +208,8 @@ function MessageBody({ item, peoplePath }: { item: Message; peoplePath: string }
   </>;
 }
 
-function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, children }: {
-  item: Message; base: string; peoplePath: string; readOnly: boolean;
+function MessageRow({ item, base, peoplePath, onReply, onDelete, children }: {
+  item: Message; base: string; peoplePath: string;
   onReply?: (item: Message, trigger: HTMLButtonElement) => void;
   onDelete: (item: Message, trigger: HTMLButtonElement) => void;
   children?: React.ReactNode;
@@ -224,7 +224,7 @@ function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, child
     ? <Image src={item.author.avatar} width={32} height={32} unoptimized alt="" className="size-8 shrink-0 rounded-full object-cover"/>
     : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">{Array.from(item.author.nickname)[0]}</span>;
   return <article className="flex min-w-0 gap-2.5">
-    {authorPath ? <AppLink href={authorPath} className="shrink-0 self-start">{avatar}</AppLink> : avatar}
+    {avatar}
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
         {authorPath
@@ -236,7 +236,7 @@ function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, child
         {item.quote && <QuotePreview nickname={item.quote.nickname} body={item.quote.body}/>}
         <MessageBody item={item} peoplePath={peoplePath}/>
       </div>
-      {!readOnly && <div className="mt-1 flex flex-wrap items-center gap-x-1">
+      <div className="mt-1 flex flex-wrap items-center gap-x-1">
         <Button type="button" variant="ghost" size="sm" className={`${actionClass} ${liked ? "text-primary" : ""}`}
           aria-pressed={liked} aria-disabled={like.busy}
           onClick={() => {
@@ -255,7 +255,7 @@ function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, child
         {item.canDelete && <Button type="button" variant="ghost" size="sm" className={`${actionClass} hover:text-destructive`} onClick={event => onDelete(item, event.currentTarget)}>
           <Trash2 size={15} aria-hidden="true"/>{zh ? "删除" : "Delete"}
         </Button>}
-      </div>}
+      </div>
       <Feedback action={like}/>
       {children}
     </div>
@@ -273,8 +273,8 @@ function Paging({ page, total, onChange }: { page: number; total: number; onChan
   </div>;
 }
 
-function Thread({ item, base, peoplePath, readOnly, acceptingMessages, version, onDelete, changed }: {
-  item: Message; base: string; peoplePath: string; readOnly: boolean; acceptingMessages: boolean; version: number;
+function Thread({ item, base, peoplePath, acceptingMessages, version, onDelete, changed }: {
+  item: Message; base: string; peoplePath: string; acceptingMessages: boolean; version: number;
   onDelete: (item: Message, trigger: HTMLButtonElement) => void; changed: () => void;
 }) {
   const { locale } = useLocale();
@@ -293,7 +293,7 @@ function Thread({ item, base, peoplePath, readOnly, acceptingMessages, version, 
   function endReply() {
     setQuote(null); returnFocus.current?.focus();
   }
-  return <MessageRow {...{ item, base, peoplePath, readOnly, onDelete }} onReply={acceptingMessages ? beginReply : undefined}>
+  return <MessageRow {...{ item, base, peoplePath, onDelete }} onReply={acceptingMessages ? beginReply : undefined}>
     {quote && acceptingMessages && <Composer key={quote.id} base={base} quote={quote} onCancel={endReply} onSaved={() => {
       endReply(); setPage(1); setExpanded(true); changed();
     }}/>}
@@ -304,7 +304,7 @@ function Thread({ item, base, peoplePath, readOnly, acceptingMessages, version, 
     {expanded && item.replyCount > 0 && <div className="mt-2 border-l border-border pl-2 sm:pl-3">
       <State data={{ ...replies, data: currentReplies, loading: replies.loading || (!currentReplies && !replies.error) }}>
         <ol className="divide-y divide-border">{currentReplies?.items.map(reply => <li key={reply.id} className="py-2">
-          <MessageRow item={reply} {...{ base, peoplePath, readOnly, onDelete }} onReply={acceptingMessages ? beginReply : undefined}/>
+          <MessageRow item={reply} {...{ base, peoplePath, onDelete }} onReply={acceptingMessages ? beginReply : undefined}/>
         </li>)}</ol>
         <Paging page={page} total={item.replyCount} onChange={setPage}/>
       </State>
@@ -312,8 +312,8 @@ function Thread({ item, base, peoplePath, readOnly, acceptingMessages, version, 
   </MessageRow>;
 }
 
-export function ProfileGuestbook({ base, peoplePath, canPost, readOnly = false, refreshVersion }: {
-  base: string; peoplePath: string; canPost: boolean; readOnly?: boolean; refreshVersion: number;
+export function ProfileGuestbook({ base, peoplePath, canPost, refreshVersion }: {
+  base: string; peoplePath: string; canPost: boolean; refreshVersion: number;
 }) {
   const { locale } = useLocale();
   const zh = locale === "zh";
@@ -344,7 +344,7 @@ export function ProfileGuestbook({ base, peoplePath, canPost, readOnly = false, 
     {notice && <p role="status" className="mt-2 text-sm text-success">{notice}</p>}
     <State data={{ ...messages, data, loading: messages.loading || (!data && !messages.error) }}>
       {data?.items.length ? <ol className="mt-2 divide-y divide-border border-t border-border">
-        {data.items.map(item => <li key={item.id} className="py-3"><Thread {...{ item, base, peoplePath, readOnly, acceptingMessages, changed }}
+        {data.items.map(item => <li key={item.id} className="py-3"><Thread {...{ item, base, peoplePath, acceptingMessages, changed }}
           version={version + refreshVersion} onDelete={(message, trigger) => {
             deletion.reset(); setNotice(""); target.current = trigger; setSelected(message);
           }}/></li>)}

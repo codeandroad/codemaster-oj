@@ -1,12 +1,17 @@
 "use client";
 import { LeaderboardStandings } from "@/components/leaderboard-view";
+import { AppLink } from "@/components/navigation";
 import styles from "@/components/points-page.module.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { useData } from "@/components/teacher/shared";
-import { inputClass } from "@/components/admin/common";
-import { Button } from "@/components/ui/button";
+import { inputClass, Loading, panelClass } from "@/components/admin/common";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
+import { RoleLabel, useSchoolText, type SchoolRole } from "./school-ui";
+import { schoolWorkspaceHref } from "./school-workspace-location";
 type Entry = {
   rank: number;
   identityId: string;
@@ -22,6 +27,52 @@ type Entry = {
   scholarship?: number;
 };
 export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
+  const search = useSearchParams();
+  const role = search.get("schoolRole") === "teacher" ? "teacher" : undefined;
+  const href = schoolWorkspaceHref(schoolId, "leaderboard", role);
+  if (search.get("memberProfiles") === "1") return <SchoolMemberProfiles schoolId={schoolId} href={href}/>;
+  return <SchoolRankings schoolId={schoolId} href={href}/>;
+}
+
+function SchoolMemberProfiles({ schoolId, href }: { schoolId: string; href: string }) {
+  const text = useSchoolText();
+  const searchId = useId();
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const profiles = useData<{ items: { id: string; name: string; role: SchoolRole; avatar: string }[]; hasMore: boolean }>(
+    `schools/${schoolId}/profiles?${new URLSearchParams({ q: query.trim(), page: String(page), pageSize: "20" })}`,
+  );
+  return <section className={`${panelClass} space-y-4 p-4`}>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-lg font-semibold">{text("Member profiles", "成员主页")}</h2>
+      <AppLink href={href} className={buttonVariants({ variant: "secondary", size: "sm" })}>{text("Back to leaderboard", "返回排行榜")}</AppLink>
+    </div>
+    <div className="grid max-w-sm gap-1 text-sm">
+      <label htmlFor={searchId}>{text("Search by name or nickname", "搜索姓名或昵称")}</label>
+      <input id={searchId} type="search" maxLength={100} className={inputClass} value={query}
+        onChange={event => { setQuery(event.target.value); setPage(1); }}/>
+    </div>
+    <Loading resource={profiles}>
+      {profiles.data?.items.length ? <ul className="divide-y divide-border">
+        {profiles.data.items.map(member => <li key={member.id}>
+          <AppLink href={`${href}&profileId=${encodeURIComponent(member.id)}`}
+            className="flex items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
+            <Image src={member.avatar} width={32} height={32} unoptimized alt="" className="size-8 shrink-0 rounded-full object-cover"/>
+            <span className="min-w-0 flex-1 break-words font-medium">{member.name}</span>
+            <span className="shrink-0 text-xs text-muted-foreground"><RoleLabel role={member.role}/></span>
+          </AppLink>
+        </li>)}
+      </ul> : <p className="text-sm text-muted-foreground">{text("No matching members.", "没有符合条件的成员。")}</p>}
+      {(page > 1 || profiles.data?.hasMore) && <nav className="flex items-center justify-end gap-2" aria-label={text("Member pages", "成员分页")}>
+        <Button size="sm" variant="secondary" disabled={profiles.loading || page === 1} onClick={() => setPage(page - 1)}>{text("Previous", "上一页")}</Button>
+        <span className="text-sm">{page}</span>
+        <Button size="sm" variant="secondary" disabled={profiles.loading || !profiles.data?.hasMore} onClick={() => setPage(page + 1)}>{text("Next", "下一页")}</Button>
+      </nav>}
+    </Loading>
+  </section>;
+}
+
+function SchoolRankings({ schoolId, href }: { schoolId: string; href: string }) {
   const { locale } = useLocale(),
     tx = (zh: string, en: string) => (locale === "en" ? en : zh),
     [q, setQ] = useState(""),
@@ -62,6 +113,7 @@ export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
       <div ref={filterRef} className="relative flex flex-wrap items-center justify-end gap-2" onKeyDown={event => {
         if (filterOpen && event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setFilterOpen(false); }
       }}>
+        <AppLink href={href + "&memberProfiles=1"} className={styles.filterButton}>{tx("成员主页", "Member profiles")}</AppLink>
         <button type="button" className={styles.filterButton} aria-haspopup="dialog" aria-expanded={filterOpen}
           onClick={() => { setDraftQ(q); setDraftClassId(classId); setFilterOpen(value => !value); }}>
           <SlidersHorizontal size={16} aria-hidden="true" />{tx("筛选", "Filters")}
@@ -105,7 +157,7 @@ export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
       </div>
       <LeaderboardStandings ranking={ranking} leaders={page === 1 && !q ? {...ranking,data:data.data ? {items:items.slice(0,3)} : null} : undefined}
         visibleFields={{online:true,solvedProblems:!!fields.solved,attempts:!!fields.attempts,acRate:!!fields.acRate,scholarshipBalance:!!fields.scholarship}}
-        isCurrent={person=>items.some(row=>row.id===person.id && row.isOwn)} profileHref={person=>`/schools?schoolId=${schoolId}&section=leaderboard&profileId=${person.id}`}
+        isCurrent={person=>items.some(row=>row.id===person.id && row.isOwn)} profileHref={person=>`${href}&profileId=${person.id}`}
         page={page} pageSize={50} onPageChange={setPage} refresh={data.reload}/>
     </section>
   );

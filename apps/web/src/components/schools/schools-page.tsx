@@ -110,6 +110,7 @@ export function SchoolsPage({
     ? schoolDisplayName(selected, locale)
     : text("School workspace", "学校工作区");
   const requestedSection = search.get("section");
+  const ownHomepage = requestedSection === "me";
   const workspaceRole = schoolWorkspaceRole(selected?.roles ?? [], search.get("schoolRole"), requestedSection, teacherOnly);
   const admin = workspaceRole === "admin";
   const teaching = workspaceRole !== "student";
@@ -131,7 +132,7 @@ export function SchoolsPage({
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
     loaded && publicBookmark ? publicBookmark
-    : loaded && requestedSection === "me" && !selected?.studentProfileId ? (search.get("details") === "1" ? "/practice/me?details=1" : "/practice/me")
+    : loaded && ownHomepage && !selected?.memberProfileId ? (search.get("details") === "1" ? "/practice/me?details=1" : "/practice/me")
     : loaded && user.platformAdmin && search.get("join") === "1"
       ? "/platform?section=settings#schools"
       : loaded && !selected
@@ -177,7 +178,7 @@ export function SchoolsPage({
       </main>
     );
   if (!selected) return null;
-  if (!teaching || requestedSection === "me") return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
+  if (!teaching) return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
   const members = (
     <SchoolMembers
       school={selected}
@@ -222,12 +223,12 @@ export function SchoolsPage({
             schoolName={schoolName}
             navigation={
               <WorkspaceNavigation
-                items={sections.map(item => ({...item, href: href(item.section), active: !personalSettings && navigationSection === item.section}))}
+                items={sections.map(item => ({...item, href: href(item.section), active: !personalSettings && !ownHomepage && navigationSection === item.section}))}
               />
             }
             breadcrumb={
               <div className="flex min-w-0 items-center gap-2 text-sm">
-                {personalSettings || active.section !== "home" ? (
+                {personalSettings || ownHomepage || active.section !== "home" ? (
                   <>
                     <AppLink
                       href={href("home")}
@@ -253,7 +254,7 @@ export function SchoolsPage({
                     <span aria-hidden="true" className="hidden sm:block">›</span>
                   </>
                 )}
-                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : navigationLabel(active)}
+                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : ownHomepage ? text("My homepage","我的主页") : navigationLabel(active)}
                   parentHref={active.section === "classes" && search.has("classId") ? href("classes") : undefined}/>
 
               </div>
@@ -271,10 +272,10 @@ export function SchoolsPage({
                 </AppLink>
               )}
               <NotificationDropdown key={`${user.id}:${selected.id}:${workspaceRole}`} schoolId={selected.id}
-                workspace={teaching ? "staff" : "student"} scholarshipHref={href("scholarship")}/>
+                workspace={teaching ? "staff" : "student"} role={workspaceRole} scholarshipHref={href("scholarship")}/>
               <AccountMenu
                 user={user}
-                homepageHref={selected.studentProfileId ? href("me") : undefined}
+                homepageHref={selected.memberProfileId ? href("me") : undefined}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
                 busy={logout.busy}
@@ -298,6 +299,10 @@ export function SchoolsPage({
                 onUserSaved={onUserSaved}
                 onSchoolsChanged={refresh}
               />
+            ) : ownHomepage && selected.memberProfileId ? (
+              <StudentPublicProfile key={selected.memberProfileId} profileId={selected.memberProfileId} schoolId={selected.id}
+                viewer={user} workspace={admin ? "admin" : "teacher"} schoolRoles={selected.roles}
+                onUserSaved={onUserSaved} detailsOpen={search.get("details") === "1"}/>
             ) : (
               <section
                 key={`${selected.id}:${workspaceRole}:${selected.roles.join(",")}:${active.section}`}

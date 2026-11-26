@@ -154,7 +154,7 @@ function PlatformAdminPage({
                 <h1 className="truncate font-semibold">
                   {personalSettings
                     ? text("Settings", "设置")
-                    : profileId && schoolId ? text("Student profile", "学生主页") : text(platformSections[section].en, platformSections[section].zh)}
+                    : profileId && schoolId ? text("Member profile", "成员主页") : text(platformSections[section].en, platformSections[section].zh)}
                 </h1>
               </div>
             }

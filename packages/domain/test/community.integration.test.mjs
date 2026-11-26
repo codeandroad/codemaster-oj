@@ -6,11 +6,11 @@ import {migrate} from '../src/migrate.mjs';
 import {handleCommunity} from '../src/community.mjs';
 import {defaultAvatarPath} from '../src/avatars.mjs';
 
-test('community validates identity, text, and student-only posting before database writes',async()=>{
+test('community validates identity, text, and school scope before database writes',async()=>{
  const id='11111111-1111-4111-8111-111111111111';
  const ctx={route:`/profiles/${id}/messages`,method:'POST',body:{body:'Hi'},
   user:{id,identityId:randomUUID(),roles:['teacher']}};
- await assert.rejects(handleCommunity(ctx),e=>e.status===403);
+ await assert.rejects(handleCommunity(ctx),e=>e.status===404);
  await assert.rejects(handleCommunity({...ctx,user:{...ctx.user,roles:['student']},
   body:{body:'https://example.com'}}),e=>e.status===400);
  await assert.rejects(handleCommunity({...ctx,route:'/profiles/invalid-id',method:'GET'}),

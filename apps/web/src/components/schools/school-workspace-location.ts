@@ -25,7 +25,7 @@ export function schoolWorkspaceHref(schoolId: string, section = "home", role?: S
   return `/schools?${params}`;
 }
 
-export function platformStudentProfileHref(schoolId: string, profileId: string) {
+export function platformMemberProfileHref(schoolId: string, profileId: string) {
   return `/platform?${new URLSearchParams({section: "accounts", schoolId, profileId})}`;
 }
 

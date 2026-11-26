@@ -93,7 +93,8 @@ export async function provisionSchool(pool, { slug, name, adminUsername }) {
 async function listSchools(pool, user) {
   const { rows } = await pool.query(`
     SELECT s.id, s.slug, s.name, s.name_zh AS "nameZh", s.name_en AS "nameEn",
-      array_agg(m.role ORDER BY m.role) roles, pupil.id AS "studentProfileId"
+      array_agg(m.role ORDER BY m.role) roles, pupil.id AS "studentProfileId",
+      COALESCE(pupil.id,$1) AS "memberProfileId"
     FROM school_workspace_roles m JOIN schools s ON s.id = m.school_id
     LEFT JOIN school_identities pupil ON pupil.school_id=m.school_id AND pupil.account_id=m.account_id
       AND pupil.kind='student' AND pupil.archived_at IS NULL

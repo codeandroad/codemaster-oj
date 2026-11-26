@@ -205,7 +205,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.deepEqual(visitor,{nickname:before.data.own.name,avatar:before.data.own.avatar,isSelf:false});
    await request(`${profile}/activity`,{auth:auth.student,status:404});
    const messageBody={body:'Nice work on your public practice.'};
-   await request(`${profile}/messages`,{auth:auth.personal,method:'POST',body:messageBody,status:400});
+   await request(`/practice/profiles/${users.admin.id}/messages`,{auth:auth.admin,method:'POST',body:{body:'Note on my own homepage'},status:201});
    const message=(await request(`${profile}/messages`,{auth:auth.student,method:'POST',body:messageBody,status:201})).data;
    assert.match(message.author.nickname,/^Learner-[0-9A-F]{8}$/);
    assert.equal(message.author.id,undefined);

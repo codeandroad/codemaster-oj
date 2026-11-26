@@ -1391,6 +1391,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                         const cell = student.problems.find(
                           (x) => x.problemId === p.problemId,
                         );
+                        const lateWork = cell?.includesLateWork;
                         return (
                           <td
                             key={p.problemId}
@@ -1407,8 +1408,10 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <b>{cell?.status ?? "—"}</b>{cell?.includesLateWork && <span className="block text-xs text-muted-foreground">{ui(locale, "含截止后记录", "Includes late work")}</span>}{cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
-                              <p className="text-xs text-muted-foreground">
+                              <b className={lateWork ? "text-warning" : undefined}>{cell?.status ?? "—"}</b>
+                              {lateWork && <span className="block text-xs font-medium text-warning">{ui(locale, "含截止后记录", "Includes late work")}</span>}
+                              {cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
+                              <p className={`text-xs ${lateWork ? "text-warning" : "text-muted-foreground"}`}>
                                 {cell?.score === null ||
                                 cell?.score === undefined
                                   ? "—"

@@ -119,7 +119,8 @@ export function teacherAssignmentReport(
             status: current.matrixStatus ?? current.status,
             submissionId: null,
             assignmentAttempts: current.activityAttempts,
-            includesLateWork: current.activityAttempts > cell.activityAttempts || (current.solved && !cell.solved),
+            firstAcceptedAt: current.firstAcceptedAt,
+            includesLateWork: current.solved ? !cell.solved : current.activityAttempts > cell.activityAttempts,
             completionSource: current.inherited ? "other_entry" : null,
             score:
               !current.awaitingScore && (current.activityAttempts || current.solved)

@@ -59,18 +59,21 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId, includeLat
  const withinCutoff = schoolId ? `coalesce(${effectiveDue},'infinity'::timestamptz)` : effectiveDue;
  return (await db.query(`${sources}
   SELECT part.assignment_id,i.id identity_id,i.name,ap.problem_id,ap.points,
-   CASE WHEN credit.id IS NOT NULL THEN NULL ELSE s.id END submission_id,
-   CASE WHEN credit.id IS NOT NULL THEN 100 ELSE s.score END score,
-   CASE WHEN credit.id IS NOT NULL THEN 'AC' ELSE COALESCE(s.status,pending.status) END status,
-   (credit.id IS NULL AND pending.status IS NOT NULL) unresolved,
-   CASE WHEN credit.id IS NULL THEN pending.status END pending_status,
-   (credit.id IS NOT NULL) credited_ac,credit.created_at credited_at,
+   CASE WHEN credit.applied THEN NULL ELSE s.id END submission_id,
+   CASE WHEN credit.applied THEN 100 ELSE s.score END score,
+   CASE WHEN credit.applied THEN 'AC' ELSE COALESCE(s.status,pending.status) END status,
+   (credit.applied IS NOT TRUE AND pending.status IS NOT NULL) unresolved,
+   CASE WHEN credit.applied IS NOT TRUE THEN pending.status END pending_status,
+   (credit.applied IS TRUE) credited_ac,CASE WHEN credit.applied THEN credit.created_at END credited_at,
+   least(attempts.first_accepted_at,credit.created_at) AS first_accepted_at,
    attempts.total assignment_attempts,attempts.in_time eligible_attempts,(attempts.total>0) has_assignment_submission
   FROM assignment_participants part JOIN identities i ON i.id=part.identity_id
   JOIN assignments assignment ON assignment.id=part.assignment_id
   JOIN assignment_problems ap ON ap.assignment_id=part.assignment_id
   LEFT JOIN LATERAL (
-   SELECT count(*)::integer total, count(*) FILTER(WHERE $3::boolean OR created_at<=${withinCutoff})::integer in_time FROM ${receipts}
+   SELECT count(*)::integer total, count(*) FILTER(WHERE $3::boolean OR created_at<=${withinCutoff})::integer in_time,
+    min(created_at) FILTER(WHERE status='AC' AND score=100 AND ($3::boolean OR created_at<=${withinCutoff})) AS first_accepted_at
+   FROM ${receipts}
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
     AND problem_id=ap.problem_id AND kind='submit'
     AND (assignment.required_language IS NULL OR language=assignment.required_language)
@@ -90,9 +93,8 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId, includeLat
     AND status IN ('Waiting','Judging','System Error') ORDER BY created_at DESC LIMIT 1
   ) pending ON true
   LEFT JOIN LATERAL (
-   SELECT previous.id,previous.created_at FROM ${receipts} previous
-   WHERE COALESCE(s.score,0)<100
-    AND previous.assignment_id IS DISTINCT FROM part.assignment_id
+   SELECT previous.created_at,COALESCE(s.score,0)<100 AS applied FROM ${receipts} previous
+   WHERE previous.assignment_id IS DISTINCT FROM part.assignment_id
     AND ${assignmentPassingProgressSubmission}
     ${includeLate ? '' : `AND previous.created_at<=${withinCutoff}`}
    ORDER BY previous.created_at,previous.id LIMIT 1
@@ -118,6 +120,7 @@ export function assignmentGradeSummaries(rows) {
   student.hasScore ||= score !== null;
   student.problems.push({ problemId:row.problem_id, submissionId:row.submission_id ? `SUB${row.submission_id}` : null,
    score, status:row.status || 'NotSubmitted', pending:row.unresolved, pendingStatus:row.pending_status,
+   firstAcceptedAt:row.first_accepted_at ?? null,
    completionSource:row.credited_ac ? 'other_entry' : null, creditedAt:row.credited_at ?? null,
    hasAssignmentSubmission:row.has_assignment_submission, assignmentAttempts:Number(row.assignment_attempts) });
  }

@@ -246,7 +246,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
         if (changes.kind !== 'custom') assert.equal(judged.status,expected);
         return job.id;
       }
-      async function check(assignmentId, credited) {
+      async function check(assignmentId, credited, firstAcceptedId) {
         const path = list+'/'+assignmentId;
         const {data:learner} = await request(path,mine);
         const {data:report} = await request(path+'/report?view=assignment',staff);
@@ -258,6 +258,10 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
           assert.equal(view.items[0].activityAttempts,0);
         }
         assert.equal(row.progress.items[0].matrixStatus,credited ? 'AC' : 'NotSubmitted');
+        const firstAcceptedAt = credited
+          ? (await pool.query('SELECT created_at FROM school_judge_jobs WHERE id=$1', [firstAcceptedId])).rows[0].created_at.toISOString()
+          : null;
+        assert.equal(row.progress.items[0].firstAcceptedAt, firstAcceptedAt);
         assert.equal(report.items.find(item=>item.id===otherStudent).grade.solved,0);
         const {data:directory} = await request(list+'?kind=assignment&view=assignment',staff);
         assert.equal(directory.items.find(item=>item.id===assignmentId).completedStudents,Number(credited));
@@ -274,8 +278,8 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await run({kind:'samples'});
       await run({kind:'custom',input:'[2]'});
       await run({code:'def solve(data): return 0'},'WA');
-      await run({language:'javascript',code:'function solve(data) { return data*2; }'});
-      await check(anyLanguage,true);
+      const javascript = await run({language:'javascript',code:'function solve(data) { return data*2; }'});
+      await check(anyLanguage,true,javascript);
       await check(matching,false);
 
       await pool.query('UPDATE school_activities SET ends_at=$3 WHERE school_id=$1 AND id=$2',[beta.id,matching,past]);
@@ -283,12 +287,12 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await check(matching,false); // A late public AC does not change either the matrix or the official score.
       await pool.query(`UPDATE school_activity_participants SET extended_due_at=(SELECT created_at FROM school_judge_jobs WHERE id=$4)
         WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3`, [beta.id,matching,studentId,first]);
-      await check(matching,true); // Receipt exactly at this student's extended deadline.
+      await check(matching,true,first); // Receipt exactly at this student's extended deadline.
       await check(different,false);
       await pool.query('UPDATE school_activity_participants SET extended_due_at=$4 WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3',
         [beta.id,matching,studentId,future]);
       await run();
-      await check(matching,true);
+      await check(matching,true,first);
       const {data:inbox} = await request('/schools/'+beta.id+'/student-notifications',mine);
       assert.deepEqual(inbox.items.filter(item=>item.kind==='assignment_reminder').map(item=>item.assignmentId),[different]);
       const details = await request(list+'/'+matching+'/report/'+studentId+'?problemId='+p.id,staff);
@@ -533,6 +537,9 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const matrix = (await request(path+'/report?view=assignment',teacher)).data.items.find(row=>row.id===ids.peer);
       assert.equal(matrix.grade.score,0);
       assert.equal(matrix.progress.items[0].matrixStatus,'AC');
+      assert.equal(matrix.grade.items[0].firstAcceptedAt,null);
+      assert.equal(matrix.progress.items[0].firstAcceptedAt,verdict.createdAt);
+      assert.ok(verdict.createdAt);
       assert.equal(matrix.progress.items[0].activityAttempts,1);
       const directory = (await request(activities+'?kind=assignment&view=assignment',teacher)).data.items;
       assert.equal(directory.find(row=>row.id===assignment.id).completedStudents,2);
@@ -632,15 +639,19 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,language)
         VALUES($1,$2,$3,$4,'submit','print(2)',$5,'receipt','AC',100,'python')`,
         [users.fresh.id,ids.fresh,p.id,published.versionId,randomUUID()]);
-      const receipt = (await pool.query("SELECT 'SUB'||id AS id,to_char(created_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS day FROM submissions WHERE identity_id=$1 AND problem_id=$2 ORDER BY id DESC LIMIT 1",[ids.fresh,p.id])).rows[0];
+      const receipt = (await pool.query("SELECT 'SUB'||id AS id,created_at,to_char(created_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS day FROM submissions WHERE identity_id=$1 AND problem_id=$2 ORDER BY id DESC LIMIT 1",[ids.fresh,p.id])).rows[0];
       const daily = prefix+'/submissions/students/'+ids.fresh, day='?date='+receipt.day;
       assert.ok((await request(daily+day,{auth:auth.admin})).data.items.some(row=>row.id===receipt.id && row.status==='AC'));
       assert.deepEqual((await request(daily+'/'+receipt.id+day,{auth:auth.admin})).data,{code:'print(2)'});
       const grade = async () => (await request(path, student)).data.grade;
       assert.equal((await grade()).score, config.problems[0].points);
       assert.equal((await grade()).items[0].inherited,true);
+      const firstAccepted = async () => (await request(path+'/report?view=assignment',teacher)).data.items
+        .find(row=>row.id===ids.fresh).progress.items[0].firstAcceptedAt;
+      assert.equal(await firstAccepted(), receipt.created_at.toISOString());
       await pool.query("UPDATE school_activities SET required_language='cpp' WHERE school_id=$1 AND id=$2",[school.id,a.id]);
       assert.equal((await grade()).score,0);
+      assert.equal(await firstAccepted(), null);
     });
     await t.test('migrated assignment pins show only the admitted platform chapter for their exact version', async () => {
       const { rows: [course] } = await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,platform_audience_scope,published_at)

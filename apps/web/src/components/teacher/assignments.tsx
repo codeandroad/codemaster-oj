@@ -1256,6 +1256,9 @@ function AssignmentEditorForm({
 type Grade = NonNullable<Assignment["grades"]>[number];
 export function TeacherAssignmentProgress({ id, schoolId }: { id: string; schoolId?: string }) {
   const { locale } = useLocale();
+  const submissionTime = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Shanghai",
+  });
   const base = schoolId ? `schools/${schoolId}/activities/${id}` : `assignments/${id}`;
   const current = useData<AssignmentReport>(schoolId ? base+"/report?view=assignment" : null);
   const legacy = useData<TeacherAssignment>(schoolId ? null : base);
@@ -1420,12 +1423,17 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <span className={lateWork ? "inline-block rounded-md bg-neutral-800 px-2.5 py-1 text-yellow-300" : "inline-block"}>
+                              <span className={lateWork ? "text-yellow-500 dark:text-yellow-300" : undefined}>
                                 <b>{cell?.status ?? "—"}</b>
                                 {lateWork && <span className="block text-xs font-semibold">{ui(locale, "晚提交", "Late submission")}</span>}
                                 <span className={lateWork ? "block text-xs" : "block text-xs text-muted-foreground"}>
                                   {cell?.completionSource === "other_entry" && <span className="block">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
-                                  {cell?.score == null ? "—" : `${((cell.score * p.points) / 100).toFixed(2)} / ${p.points}`}
+                                  {cell?.firstAcceptedAt && (
+                                    <span className="block">
+                                      {ui(locale, "首次通过", "First accepted")}{" "}
+                                      <time dateTime={cell.firstAcceptedAt}>{submissionTime.format(new Date(cell.firstAcceptedAt))}</time>
+                                    </span>
+                                  )}
                                 </span>
                               </span>
                             </button>

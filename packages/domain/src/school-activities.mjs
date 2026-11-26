@@ -129,8 +129,14 @@ const publicAttempt = t => t ? { id: t.id, startedAt: t.started_at, deadlineAt: 
 export async function calculateSchoolActivityGrade(db, a, studentId, { includeLate = false, staffMatrix = false } = {}) {
   const entries = await problems(db, a);
   const formal = "j.activity_id=a.id AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity'))";
+  const accepted = "j.state='completed' AND j.result->>'status'='AC'";
+  const elsewhere = `a.kind='assignment' AND j.activity_id IS DISTINCT FROM a.id
+    AND ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
+    AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')}`;
   const rows = (await db.query(`SELECT p.problem_id,
-    ${staffMatrix ? `(array_agg(j.result->>'status' ORDER BY (j.result->>'score')::numeric DESC NULLS LAST,j.created_at,j.id)
+    ${staffMatrix ? `least(credit.first_accepted_at, min(j.created_at) FILTER (
+      WHERE ${accepted} AND ((${formal}) OR (${elsewhere})))) AS first_accepted_at,
+      (array_agg(j.result->>'status' ORDER BY (j.result->>'score')::numeric DESC NULLS LAST,j.created_at,j.id)
       FILTER (WHERE ${formal} AND j.state='completed' AND j.result->>'status'<>'System Error'))[1] AS best_status,
       (array_agg(coalesce(j.result->>'status',CASE j.state WHEN 'leased' THEN 'Judging' WHEN 'failed' THEN 'System Error' ELSE 'Waiting' END) ORDER BY j.created_at DESC)
       FILTER (WHERE ${formal} AND (j.state<>'completed' OR j.result->>'status'='System Error')))[1] AS pending_status,` : ''}
@@ -139,10 +145,8 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
     count(j.id) FILTER(WHERE ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
       AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')})::int + coalesce(credit.accepted_runs,0) AS all_attempts,
     max(CASE WHEN j.activity_id=a.id AND j.state='completed' AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity')) THEN (j.result->>'score')::numeric END) AS best,
-    bool_or(j.activity_id=a.id AND j.state='completed' AND j.result->>'status'='AC' AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity'))) AS accepted,
-    bool_or(a.kind='assignment' AND j.activity_id IS DISTINCT FROM a.id AND j.state='completed' AND j.result->>'status'='AC'
-      AND ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
-      AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')}) OR credit.accepted_runs IS NOT NULL AS inherited
+    bool_or(${formal} AND ${accepted}) AS accepted,
+    bool_or(${elsewhere} AND ${accepted}) OR credit.accepted_runs IS NOT NULL AS inherited
     FROM school_activities a JOIN school_activity_problems p ON p.school_id=a.school_id AND p.activity_id=a.id
     LEFT JOIN school_activity_participants part ON part.school_id=a.school_id AND part.activity_id=a.id AND part.identity_id=$3
     LEFT JOIN school_assignment_public_credit credit ON (credit.school_id,credit.activity_id,credit.identity_id,credit.problem_id)
@@ -150,7 +154,7 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
     LEFT JOIN school_judge_jobs j ON j.school_id=p.school_id AND j.problem_id=p.problem_id AND j.version_id=p.version_id
       AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit'
       AND (a.required_language IS NULL OR coalesce(j.payload->>'language','python')=a.required_language)
-    WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id,credit.accepted_runs`, [a.school_id, a.id, studentId, includeLate && a.kind === 'assignment'])).rows;
+    WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id,credit.accepted_runs,credit.first_accepted_at`, [a.school_id, a.id, studentId, includeLate && a.kind === 'assignment'])).rows;
   if (a.kind === 'assignment') {
     const receipts = await schoolAssignmentReceiptGrades(db, a, studentId, includeLate);
     const byProblem = new Map(receipts.map(receipt => [receipt.problem_id, receipt]));
@@ -160,6 +164,9 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
       row.activity_attempts += prior.eligible_attempts;
       row.all_attempts += prior.eligible_attempts;
       if (staffMatrix) {
+        if (prior.first_accepted_at && (!row.first_accepted_at || prior.first_accepted_at < row.first_accepted_at)) {
+          row.first_accepted_at = prior.first_accepted_at;
+        }
         if (prior.score != null && (row.best==null || Number(prior.score)>Number(row.best))) row.best_status=prior.status;
         row.pending_status ??= prior.pending_status;
       }
@@ -175,7 +182,8 @@ function activityGrade(entries, rows, kind) {
     const r = rows.find(item => item.problem_id === p.id);
     const solved = Boolean(r?.accepted || r?.inherited);
     const percentage = solved ? 100 : Math.max(0, Math.min(100, Number(r?.best ?? 0)));
-    return { ...p, ...(r && 'best_status' in r && {matrixStatus:solved?'AC':r.best_status??r.pending_status??'NotSubmitted', awaitingScore:!solved && !r.best_status && !!r.pending_status}),
+    return { ...p, ...(r && 'best_status' in r && {matrixStatus:solved?'AC':r.best_status??r.pending_status??'NotSubmitted',
+      firstAcceptedAt:r.first_accepted_at ?? null, awaitingScore:!solved && !r.best_status && !!r.pending_status}),
       status: solved ? 'AC' : r?.activity_attempts ? 'NotPassed' : 'NotStarted', solved,
       score: Math.round(percentage * p.points) / 100, attempts: kind === 'assignment' ? r?.all_attempts ?? 0 : r?.activity_attempts ?? 0,
       activityAttempts: r?.activity_attempts ?? 0, inherited: Boolean(r?.inherited && !r?.accepted) };

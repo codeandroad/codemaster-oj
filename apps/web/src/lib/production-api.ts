@@ -141,6 +141,7 @@ export interface Assignment {
       submissionId: string | null;
       completionSource?: "other_entry" | null;
       creditedAt?: string | null;
+      firstAcceptedAt?: string | null;
       hasAssignmentSubmission?: boolean;
       assignmentAttempts?: number;
       includesLateWork?: boolean;

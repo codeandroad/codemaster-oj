@@ -44,7 +44,7 @@ function HistoryPage({base,date,page,setPage}: {base:string;date:string;page:num
         className="flex w-full flex-wrap items-baseline gap-x-4 gap-y-1 rounded text-left text-sm ">
         <time dateTime={item.createdAt} className="font-mono">{beijingTime.format(new Date(item.createdAt))}</time>
         <span className="min-w-32 flex-1"><strong>{item.title}</strong>{item.activity && <span className="block text-xs text-muted-foreground">{item.activity}</span>}</span>
-        <span>{item.origin==="shared" ? text("Public practice · Shared by student","公开练习 · 学生分享") : item.origin==="classroom" ? text("Public problem · Classroom practice","公开题目 · 课堂练习") : text("School practice","校内练习")}</span>
+        <span>{item.origin==="shared" ? text("Public practice · Shared by student","公开练习 · 学生分享") : item.origin==="classroom" ? text("Public problem · For school assignments","公开题目 · 用于本校作业") : text("School practice","校内练习")}</span>
         <span>{kindLabel(item.kind,locale)}</span><strong>{item.status}</strong>
         {item.canViewCode ? <button type="button" aria-expanded={open===item.id} onClick={()=>setOpen(open===item.id ? null : item.id)} className="text-primary underline">
           {open===item.id ? text("Hide code","收起代码") : text("View code","查看代码")}</button> : <span>{text("Summary only","仅分享摘要")}</span>}

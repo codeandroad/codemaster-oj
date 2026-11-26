@@ -58,7 +58,7 @@ function RunSelection({date,school}:{date:string;school?:School}) {
   const items=records.data?.items ?? [];
   const selectable=items.filter(run=>run.visibility!=="classroom");
   const selected=selectable.filter(run=>checked.includes(run.id));
-  const labels={private:text("Not shared","未分享"),summary:text("Summary shared","已分享摘要"),code:text("Summary and code shared","已分享摘要及代码"),classroom:text("Classroom run","课堂练习")};
+  const labels={private:text("Not shared","未分享"),summary:text("Summary shared","已分享摘要"),code:text("Summary and code shared","已分享摘要及代码"),classroom:text("For school assignments","用于学校作业")};
   function update(visibility:"summary"|"code"|"private") {
     if (!school || !selected.length) return;
     void action.run(async()=>{

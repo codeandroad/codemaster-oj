@@ -149,6 +149,9 @@ export async function assignmentCompletionCounts(db, schoolId, ids, visibleJobSq
         j.activity_id IS DISTINCT FROM assignment.id AND ${visibleJobSql}
         AND (assignment.cancelled_at IS NULL OR j.created_at<=assignment.cancelled_at)))
     ) OR EXISTS (
+      SELECT 1 FROM school_assignment_public_credit credit
+      WHERE (credit.school_id,credit.activity_id,credit.identity_id,credit.problem_id)=(part.school_id,part.activity_id,part.identity_id,ap.problem_id)
+    ) OR EXISTS (
       SELECT 1 FROM submissions previous WHERE previous.school_id=part.school_id AND ${assignmentPassingProgressSubmission}
     ))
   ) completed GROUP BY completed.activity_id`,

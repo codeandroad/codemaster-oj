@@ -38,6 +38,8 @@ export async function insertSchoolAssignmentReminders(db, schoolId, identityId) 
       AND EXISTS(SELECT 1 FROM school_activity_problems ap WHERE ap.school_id=assignment.school_id AND ap.activity_id=assignment.id
         AND NOT EXISTS(SELECT 1 FROM submissions previous WHERE previous.school_id=assignment.school_id
           AND ${assignmentPassingProgressSubmission})
+        AND NOT EXISTS(SELECT 1 FROM school_assignment_public_credit credit
+          WHERE (credit.school_id,credit.activity_id,credit.identity_id,credit.problem_id)=(part.school_id,part.activity_id,part.identity_id,ap.problem_id))
         AND NOT EXISTS(SELECT 1 FROM school_judge_jobs j
           WHERE j.school_id=assignment.school_id AND j.identity_id=part.identity_id AND j.problem_id=ap.problem_id AND j.version_id=ap.version_id
             AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'

@@ -462,7 +462,7 @@ export function TeacherReports() {
                             )?.title ?? p.problemId.slice(0, 8)}
                           </span>
                           <span>
-                            {statusLabel(p.status)}{p.completionSource === "other_entry" && ` (${tr("其他入口已通过", "Passed elsewhere")})`} ·{" "}
+                            {statusLabel(p.status)}{p.completionSource === "other_entry" && ` (${tr("已在其他入口通过", "Passed elsewhere")})`} ·{" "}
                             {p.score === null ? tr("待评测", "Pending") : `${p.score}%`}
                           </span>
                         </button>

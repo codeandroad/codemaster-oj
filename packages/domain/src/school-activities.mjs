@@ -137,18 +137,20 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
 
     count(j.id) FILTER(WHERE j.activity_id=a.id AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity')))::int AS activity_attempts,
     count(j.id) FILTER(WHERE ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
-      AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')})::int AS all_attempts,
+      AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')})::int + coalesce(credit.accepted_runs,0) AS all_attempts,
     max(CASE WHEN j.activity_id=a.id AND j.state='completed' AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity')) THEN (j.result->>'score')::numeric END) AS best,
     bool_or(j.activity_id=a.id AND j.state='completed' AND j.result->>'status'='AC' AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity'))) AS accepted,
     bool_or(a.kind='assignment' AND j.activity_id IS DISTINCT FROM a.id AND j.state='completed' AND j.result->>'status'='AC'
       AND ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
-      AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')}) AS inherited
+      AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')}) OR credit.accepted_runs IS NOT NULL AS inherited
     FROM school_activities a JOIN school_activity_problems p ON p.school_id=a.school_id AND p.activity_id=a.id
     LEFT JOIN school_activity_participants part ON part.school_id=a.school_id AND part.activity_id=a.id AND part.identity_id=$3
+    LEFT JOIN school_assignment_public_credit credit ON (credit.school_id,credit.activity_id,credit.identity_id,credit.problem_id)
+      =(a.school_id,a.id,part.identity_id,p.problem_id)
     LEFT JOIN school_judge_jobs j ON j.school_id=p.school_id AND j.problem_id=p.problem_id AND j.version_id=p.version_id
       AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit'
       AND (a.required_language IS NULL OR coalesce(j.payload->>'language','python')=a.required_language)
-    WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id`, [a.school_id, a.id, studentId, includeLate && a.kind === 'assignment'])).rows;
+    WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id,credit.accepted_runs`, [a.school_id, a.id, studentId, includeLate && a.kind === 'assignment'])).rows;
   if (a.kind === 'assignment') {
     const receipts = await schoolAssignmentReceiptGrades(db, a, studentId, includeLate);
     const byProblem = new Map(receipts.map(receipt => [receipt.problem_id, receipt]));

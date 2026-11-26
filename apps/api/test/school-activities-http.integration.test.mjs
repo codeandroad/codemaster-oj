@@ -25,12 +25,15 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       has_table_privilege('campus_app','school_public_run_shares','SELECT') AND
       has_column_privilege('campus_app','school_public_run_shares','visibility','UPDATE') AND
       NOT has_table_privilege('campus_app','school_public_run_shares','UPDATE') AND
-      NOT has_table_privilege('campus_worker','school_public_run_shares','SELECT') AS correct`);
+      NOT has_table_privilege('campus_worker','school_public_run_shares','SELECT') AND
+      has_table_privilege('campus_app','school_assignment_public_credit','SELECT') AND
+      NOT has_table_privilege('campus_app','school_assignment_public_credit','UPDATE') AND
+      NOT has_table_privilege('campus_worker','school_assignment_public_credit','SELECT') AS correct`);
     assert.equal(privileges.rows[0].correct,true);
     const grantSql = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];
     await pool.query(grantSql.replaceAll('SCHEMA public', 'SCHEMA ' + schema));
     const password = randomBytes(24).toString('base64url'), hash = await hashPassword(password), users = {}, ids = {};
-    for (const name of ['admin', 'teacher', 'student', 'peer', 'fresh', 'outside']) {
+    for (const name of ['admin', 'teacher', 'student', 'peer', 'fresh', 'outside', 'classmate']) {
       const identity = randomUUID();
       await pool.query("INSERT INTO identities(id,kind,number,name) VALUES($1,'personal',$2,$2)", [identity, name]);
       users[name] = (await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id', [identity, name, hash])).rows[0];
@@ -192,6 +195,106 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
         await processSchoolOne({pool:worker,judge:{judge:async()=>completed}});
         assert.equal((await pool.query('SELECT state FROM school_judge_jobs WHERE id=$1',[id])).rows[0].state,'completed');
       }
+    });
+    await t.test('public formal AC designated for an assignment school earns only matching on-time credit', async () => {
+      const mine = { auth: auth.classmate }, staff = { auth: auth.outside };
+      const studentId = randomUUID(), otherStudent = randomUUID(), anotherVersion = randomUUID();
+      const list = '/schools/' + beta.id + '/activities';
+      await pool.query(`INSERT INTO school_memberships(school_id,account_id,role)
+        VALUES($1,$3,'student'),($2,$3,'student')`, [school.id,beta.id,users.classmate.id]);
+      await pool.query(`INSERT INTO school_identities(school_id,id,account_id,kind,name,number)
+        VALUES($1,gen_random_uuid(),$3,'student','Learner A','A'),($2,$4,$3,'student','Learner B','B')`,
+        [school.id,beta.id,users.classmate.id,studentId]);
+      await pool.query("INSERT INTO school_identities(school_id,id,kind,name,number) VALUES($1,$2,'student','Peer B','Peer-B')",
+        [beta.id,otherStudent]);
+      // The public edition executes in A. B holds its own pinned copy of the same version.
+      const {rows:[bankB]} = await pool.query(`INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id,resource_kind)
+        VALUES($1,$2,'Publication snapshots',gen_random_uuid(),'publication') RETURNING id`, [beta.id,users.outside.id]);
+      await pool.query(`INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id)
+        VALUES($1,$2,$3,$4,'{}',gen_random_uuid())`, [beta.id,p.id,bankB.id,users.outside.id]);
+      for (const [revision,version] of [[1,published.versionId],[2,anotherVersion]]) {
+        await pool.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
+          SELECT $1,$2,problem_id,$3,definition FROM school_problem_versions WHERE school_id=$4 AND id=$5`,
+          [beta.id,version,revision,school.id,published.versionId]);
+      }
+      async function assignment(version, endsAt, requiredLanguage='python') {
+        const {rows:[activity]} = await pool.query(`INSERT INTO school_activities
+          (school_id,owner_account_id,kind,title,state,published_at,ends_at,required_language,request_id,request_hash)
+          VALUES($1,$2,'assignment','Public exercise','Published',now(),$3,$4,gen_random_uuid(),'fixture') RETURNING id`,
+          [beta.id,users.outside.id,endsAt,requiredLanguage]);
+        await pool.query(`INSERT INTO school_activity_problems(school_id,activity_id,problem_id,version_id,position,points)
+          VALUES($1,$2,$3,$4,1,37.25)`, [beta.id,activity.id,p.id,version]);
+        await pool.query('INSERT INTO school_activity_participants(school_id,activity_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)',
+          [beta.id,activity.id,studentId,otherStudent]);
+        return activity.id;
+      }
+      const future = new Date(Date.now()+3600000), past = new Date(Date.now()-3600000);
+      const matching = await assignment(published.versionId,future), different = await assignment(anotherVersion,future);
+      const anyLanguage = await assignment(published.versionId,future,null);
+      await pool.query(`INSERT INTO school_scholarship_activity_rules(school_id,activity_type,activity_id,revision,amount,require_all)
+        VALUES($1,'activity',$2,1,9,true)`,[beta.id,matching]);
+      const publicPath = '/practice/problems/'+p.id+'/submissions';
+      const solver = process.env.GO_JUDGE_TEST_URL ? new GoJudge({url:process.env.GO_JUDGE_TEST_URL,
+        token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'public-assignment-credit-qa'}) : null;
+      async function run(changes = {}, expected = 'AC') {
+        const {data:job} = await request(publicPath,{...mine,method:'POST',status:202,body:{
+          kind:'submit',language:'python',code:'def solve(data): return data*2',requestId:randomUUID(),classroomSchoolId:beta.id,...changes,
+        }});
+        await processSchoolOne({pool:worker,judge:solver ?? (expected==='WA' ? mismatch : {judge:async()=>completed})});
+        const {data:judged} = await request(publicPath+'/'+job.id,mine);
+        assert.equal(judged.state,'completed');
+        if (changes.kind !== 'custom') assert.equal(judged.status,expected);
+        return job.id;
+      }
+      async function check(assignmentId, credited) {
+        const path = list+'/'+assignmentId;
+        const {data:learner} = await request(path,mine);
+        const {data:report} = await request(path+'/report?view=assignment',staff);
+        const row = report.items.find(item=>item.id===studentId);
+        for (const view of [learner.grade,learner.progress,row.grade,row.progress]) {
+          assert.equal(view.score,credited ? 37.25 : 0);
+          assert.equal(view.solved,credited ? 1 : 0);
+          assert.equal(view.items[0].inherited,credited);
+          assert.equal(view.items[0].activityAttempts,0);
+        }
+        assert.equal(row.progress.items[0].matrixStatus,credited ? 'AC' : 'NotSubmitted');
+        assert.equal(report.items.find(item=>item.id===otherStudent).grade.solved,0);
+        const {data:directory} = await request(list+'?kind=assignment&view=assignment',staff);
+        assert.equal(directory.items.find(item=>item.id===assignmentId).completedStudents,Number(credited));
+      }
+      const personal = await run({classroomSchoolId:null});
+      await check(matching,false);
+      const {rows:[{day}]} = await pool.query(`SELECT to_char(created_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS day
+        FROM school_judge_jobs WHERE id=$1`, [personal]);
+      for (const visibility of ['summary','code']) {
+        await request('/practice/run-sharing',{...mine,method:'POST',body:{date:day,schoolId:beta.id,records:[school.id+':'+personal],visibility}});
+        await check(matching,false);
+      }
+      await run({classroomSchoolId:school.id});
+      await run({kind:'samples'});
+      await run({kind:'custom',input:'[2]'});
+      await run({code:'def solve(data): return 0'},'WA');
+      await run({language:'javascript',code:'function solve(data) { return data*2; }'});
+      await check(anyLanguage,true);
+      await check(matching,false);
+
+      await pool.query('UPDATE school_activities SET ends_at=$3 WHERE school_id=$1 AND id=$2',[beta.id,matching,past]);
+      const first = await run();
+      await check(matching,false); // A late public AC does not change either the matrix or the official score.
+      await pool.query(`UPDATE school_activity_participants SET extended_due_at=(SELECT created_at FROM school_judge_jobs WHERE id=$4)
+        WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3`, [beta.id,matching,studentId,first]);
+      await check(matching,true); // Receipt exactly at this student's extended deadline.
+      await check(different,false);
+      await pool.query('UPDATE school_activity_participants SET extended_due_at=$4 WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3',
+        [beta.id,matching,studentId,future]);
+      await run();
+      await check(matching,true);
+      const {data:inbox} = await request('/schools/'+beta.id+'/student-notifications',mine);
+      assert.deepEqual(inbox.items.filter(item=>item.kind==='assignment_reminder').map(item=>item.assignmentId),[different]);
+      const details = await request(list+'/'+matching+'/report/'+studentId+'?problemId='+p.id,staff);
+      assert.deepEqual(details.data.items,[]);
+      const awards = await pool.query('SELECT 1 FROM school_scholarship_activity_awards WHERE school_id=$1 AND activity_id=$2',[beta.id,matching]);
+      assert.equal(awards.rowCount,0);
     });
     const config = { kind: 'timed', title: 'Timed assessment', description: '', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), durationMinutes: 30, problems: [{ problemId: p.id, versionId: published.versionId, points: 50 }], identityIds: [ids.student, ids.peer], requestId: randomUUID() };
     await t.test('assignment reward and draft save atomically with retry and revision protection', async () => {

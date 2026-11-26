@@ -48,14 +48,14 @@ function PublicWorkspace({user, problem, catalog, reloadProblem, workspaceSchool
       context: inCourse ? `public-course:${courseId}:${chapterId}` : "public-practice",
       requestScope: classroom?.id,
       statusBanner: <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-surface px-4 py-2 text-sm">
-        <label>{locale === "en" ? "Run this problem as " : "本题运行归属 "}
+        <label>{locale === "en" ? "Use this problem for " : "本题用途 "}
           <select className="rounded border border-input bg-background px-2 py-1" value={classroom?.id ?? ""} onChange={e=>setSelectedSchool(e.target.value)}>
             <option value="">{locale === "en" ? "Personal practice" : "个人练习"}</option>
-            {memberships.data?.items.filter(s=>s.roles.includes("student")).map(s=><option key={s.id} value={s.id}>{schoolDisplayName(s,locale)} · {locale === "en" ? "Classroom" : "课堂练习"}</option>)}
+            {memberships.data?.items.filter(s=>s.roles.includes("student")).map(s=><option key={s.id} value={s.id}>{schoolDisplayName(s,locale)} · {locale === "en" ? "For school assignments" : "用于本校作业"}</option>)}
           </select>
         </label>
         <span aria-live="polite">{classroom
-          ? (locale==="en" ? `Administrators at ${schoolDisplayName(classroom,locale)} can see each new run, submission and its code.` : `${schoolDisplayName(classroom,locale)}的管理员可以查看本题接下来的每次运行、正式提交和当次代码。`)
+          ? (locale==="en" ? `Administrators at ${schoolDisplayName(classroom,locale)} can see each new run, submission and its code. A formal AC received by the deadline earns full credit for matching assignments that require this version and accept this language.` : `${schoolDisplayName(classroom,locale)}的管理员可以查看本题接下来的每次运行、正式提交和当次代码。截止前正式提交并通过，且版本、语言符合作业要求，该题即计满分。`)
           : (locale==="en" ? "You can share personal runs with a school from Submissions." : "个人练习可在「提交记录」中自行选择分享给学校。")}</span>
       </div>,
       requiredLanguage: validChapter ? course.data?.requiredLanguage : null,

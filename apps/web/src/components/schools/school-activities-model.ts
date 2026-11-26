@@ -20,7 +20,7 @@ export type ActivityOptions = {
   students: { id: string; name: string; number: string; activated: boolean; classIds: string[] }[];
   classes: { id: string; name: string }[];
 };
-export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; classes: { id: string; name: string }[]; exempt: boolean; dueAt: string | null; attempt: ActivityAttempt | null; grade: ActivityGrade }[] };
+export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; classes: { id: string; name: string }[]; exempt: boolean; dueAt: string | null; attempt: ActivityAttempt | null; grade: ActivityGrade; progress?: ActivityGrade }[] };
 export function activityDateInput(value: string | null) {
   return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : "";
 }

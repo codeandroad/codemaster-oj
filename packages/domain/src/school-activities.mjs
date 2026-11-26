@@ -128,7 +128,7 @@ const publicAttempt = t => t ? { id: t.id, startedAt: t.started_at, deadlineAt: 
 
 export async function calculateSchoolActivityGrade(db, a, studentId, { includeLate = false, staffMatrix = false } = {}) {
   const entries = await problems(db, a);
-  const formal = "j.activity_id=a.id AND j.created_at<=coalesce(j.activity_deadline_at,'infinity')";
+  const formal = "j.activity_id=a.id AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity'))";
   const rows = (await db.query(`SELECT p.problem_id,
     ${staffMatrix ? `(array_agg(j.result->>'status' ORDER BY (j.result->>'score')::numeric DESC NULLS LAST,j.created_at,j.id)
       FILTER (WHERE ${formal} AND j.state='completed' AND j.result->>'status'<>'System Error'))[1] AS best_status,
@@ -682,7 +682,17 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         FROM school_activity_participants p JOIN school_identities i ON i.school_id=p.school_id AND i.id=p.identity_id
         WHERE p.school_id=$1 AND p.activity_id=$2 ORDER BY i.name,i.number,i.id`, [schoolId, a.id, a.ends_at])).rows;
       const items = [];
-      for (const row of rows) items.push({ ...row, attempt: publicAttempt(await attempt(db, a, row.id)), grade: a.results_published_at ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [schoolId, a.id, row.id])).rows[0]?.grade : await calculateSchoolActivityGrade(db, a, row.id, {staffMatrix:a.kind==='assignment'}) });
+      const assignmentMatrix = a.kind === 'assignment' && url.searchParams.get('view') === 'assignment';
+      for (const row of rows) {
+        const grade = a.results_published_at
+          ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [schoolId,a.id,row.id])).rows[0]?.grade
+          : await calculateSchoolActivityGrade(db,a,row.id,{staffMatrix:a.kind==='assignment'});
+        const item = {...row, attempt:publicAttempt(await attempt(db,a,row.id)), grade};
+        if (assignmentMatrix && !row.exempt) {
+          item.progress = await calculateSchoolActivityGrade(db,a,row.id,{includeLate:true,staffMatrix:true});
+        }
+        items.push(item);
+      }
       const revisions=(await db.query('SELECT id,revision,reason,created_at AS "createdAt",grades FROM school_activity_result_revisions WHERE school_id=$1 AND activity_id=$2 ORDER BY revision DESC',[schoolId,a.id])).rows;
       return reply({ activity: await detail(db, loaded, user), items,revisions });
     } else if (action === 'problems' && match[4]) {

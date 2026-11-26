@@ -1325,7 +1325,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
             <div className="border-b border-border px-4 py-3">
               <h2 className="font-bold">{ui(locale, "学生进度矩阵", "Student progress matrix")}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                {ui(locale, "成绩取截止前最高有效分；同题在其他入口符合计分规则的正式 AC 可直接计满分，标注来源且不新增提交或奖励。", "Grades use the best valid score before the deadline. An eligible formal AC on the same problem elsewhere earns full credit, with its source marked and no new submission or reward.")}
+                {schoolId ? ui(locale, "进度包含补交。截止成绩取截止前最高有效分，符合条件的其他入口通过也可计分。", "Progress includes late work. Deadline scores use the best eligible result before the cutoff, including eligible passes elsewhere.") : ui(locale, "成绩取截止前最高有效分；同题在其他入口符合计分规则的正式 AC 可直接计满分，标注来源且不新增提交或奖励。", "Grades use the best valid score before the deadline. An eligible formal AC on the same problem elsewhere earns full credit, with its source marked and no new submission or reward.")}
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -1339,7 +1339,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                       {ui(locale, "学生", "Student")}
                     </th>
                     <th className="px-3 py-3">{ui(locale, "状态", "Status")}</th>
-                    <th className="px-3 py-3">{ui(locale, "分数", "Score")}</th>
+                    <th className="px-3 py-3">{schoolId ? ui(locale, "截止成绩", "Deadline score") : ui(locale, "分数", "Score")}</th>
                     {assignment.problems.map((p) => (
                       <th
                         key={p.problemId}
@@ -1407,7 +1407,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <b>{cell?.status ?? "—"}</b>{cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "其他入口已通过", "Passed elsewhere")}</span>}
+                              <b>{cell?.status ?? "—"}</b>{cell?.includesLateWork && <span className="block text-xs text-muted-foreground">{ui(locale, "含截止后记录", "Includes late work")}</span>}{cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "其他入口已通过", "Passed elsewhere")}</span>}
                               <p className="text-xs text-muted-foreground">
                                 {cell?.score === null ||
                                 cell?.score === undefined

@@ -1,3 +1,4 @@
+import { studentJudgingHistory } from './school-student-judging-history.mjs';
 import { lockPlatformContent } from './platform-content-access.mjs';
 import { schoolBankDirectory } from './school-bank-directory.mjs';
 import { ownSchoolReceipt, receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
@@ -440,6 +441,8 @@ async function importSchoolProblems(db, schoolId, user, role, body) {
 
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
+ const history=route.match(/^\/schools\/([^/]+)\/submissions\/students\/([^/]+)(?:\/([^/]+))?$/);
+ if(history && method==='GET')return studentJudgingHistory({pool,user,school:history[1],identity:history[2],record:history[3],url});
  const isSubmission=method==='POST'&&/^\/practice\/problems\/[^/]+\/submissions$/.test(route);
  const courseContext=isSubmission?{courseId:body.courseId,chapterId:body.chapterId,versionId:body.versionId}
   :{courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};

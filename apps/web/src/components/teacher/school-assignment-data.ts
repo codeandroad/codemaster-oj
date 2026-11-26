@@ -101,7 +101,7 @@ export function teacherAssignmentReport(
     })),
     grades: report.items
       .filter((person) => !person.exempt)
-      .map(({ id, name, grade }) => ({
+      .map(({ id, name, grade, progress }) => ({
         identityId: id,
         name,
         score:
@@ -112,17 +112,21 @@ export function teacherAssignmentReport(
             ? null
             : grade.score,
         maxScore: grade.total,
-        problems: grade.items.map((cell) => ({
-          problemId: cell.id,
-          status: cell.matrixStatus ?? cell.status,
-          submissionId: null,
-          assignmentAttempts: cell.activityAttempts,
-          completionSource: cell.inherited ? "other_entry" : null,
-          score:
-            !cell.awaitingScore && (cell.activityAttempts || cell.solved)
-              ? (cell.score * 100) / cell.points
-              : null,
-        })),
+        problems: grade.items.map((cell) => {
+          const current = progress?.items.find((problem) => problem.id === cell.id) ?? cell;
+          return {
+            problemId: cell.id,
+            status: current.matrixStatus ?? current.status,
+            submissionId: null,
+            assignmentAttempts: current.activityAttempts,
+            includesLateWork: current.activityAttempts > cell.activityAttempts || (current.solved && !cell.solved),
+            completionSource: current.inherited ? "other_entry" : null,
+            score:
+              !current.awaitingScore && (current.activityAttempts || current.solved)
+                ? (current.score * 100) / current.points
+                : null,
+          };
+        }),
       })),
   };
 }

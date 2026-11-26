@@ -4,6 +4,7 @@ import { AccountAccessAction } from "./account-access-action";
 
 import { LearnerWorkspace } from "./learner-workspace";
 import { PageHeadingProvider, useCurrentPageHeading } from "../page-heading-context";
+import { StudentJudgingHistory } from "./student-judging-history";
 import { StudentPublicProfile } from "../student/public-profile";
 import { useEffect, useRef, useState } from "react";
 import { useWorkspaceData } from "@/components/workspace-data";
@@ -328,7 +329,9 @@ export function SchoolsPage({
                 ) : active.section === "scholarship" ? (
                   <SchoolScholarship schoolId={selected.id} role={role} />
                 ) : active.section === "leaderboard" ? (
-                  search.get("profileId") ? <StudentPublicProfile profileId={search.get("profileId")!} schoolId={selected.id} viewer={user} workspace={admin?"admin":teaching?"teacher":"student"} /> : <SchoolLeaderboard schoolId={selected.id} />
+                  search.get("profileId") && role==="school_admin" && search.get("judgingHistory")==="1"
+                    ? <StudentJudgingHistory schoolId={selected.id} profileId={search.get("profileId")!}/>
+                    : search.get("profileId") ? <StudentPublicProfile judgingHistoryHref={role==="school_admin" ? "/schools?"+search.toString()+"&judgingHistory=1" : undefined} profileId={search.get("profileId")!} schoolId={selected.id} viewer={user} workspace={admin?"admin":teaching?"teacher":"student"} /> : <SchoolLeaderboard schoolId={selected.id} />
                 ) : active.section === "classes" ? (
                   <SchoolClasses
                     management={admin}

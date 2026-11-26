@@ -143,6 +143,7 @@ export interface Assignment {
       creditedAt?: string | null;
       hasAssignmentSubmission?: boolean;
       assignmentAttempts?: number;
+      includesLateWork?: boolean;
       score: number | null;
       status: string;
     }[];

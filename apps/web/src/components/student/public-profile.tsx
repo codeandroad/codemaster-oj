@@ -63,7 +63,7 @@ export function ProfileMessagesPanel({ sharing, children }: { sharing?: ReactNod
 }
 
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
-export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student", schoolId }: { schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
+export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, embedded = false, workspace = "student", schoolId }: { judgingHistoryHref?:string; schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
   const { locale } = useLocale();
   const practice = workspace === "practice";
   const showActivity = !practice || embedded;
@@ -103,6 +103,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
       {embedded && stats}
       {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={!schoolId && !practice ? profileId : undefined} showBio={!practice} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=profile` : `/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
         {!practice && stats}
+        {judgingHistoryHref && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
       </ProfileHero>}
     </State>
 

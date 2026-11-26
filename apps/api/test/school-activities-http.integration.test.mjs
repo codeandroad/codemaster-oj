@@ -342,6 +342,12 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.equal(progress.solved, 1);
       assert.equal(progress.items[0].status, 'AC');
       assert.equal(progress.items[0].activityAttempts, 1);
+      const matrix = (await request(path+'/report?view=assignment',teacher)).data.items.find(row=>row.id===ids.peer);
+      assert.equal(matrix.grade.score,0);
+      assert.equal(matrix.progress.items[0].matrixStatus,'AC');
+      assert.equal(matrix.progress.items[0].activityAttempts,1);
+      const directory = (await request(activities+'?kind=assignment&view=assignment',teacher)).data.items;
+      assert.equal(directory.find(row=>row.id===assignment.id).completedStudents,2);
       assert.equal((await request(problem, peer)).data.solved, true);
       assert.equal(history.solved, true);
       assert.deepEqual(await awards(), [{ identity_id: ids.student, delta: 12 }]);
@@ -438,6 +444,10 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,language)
         VALUES($1,$2,$3,$4,'submit','print(2)',$5,'receipt','AC',100,'python')`,
         [users.fresh.id,ids.fresh,p.id,published.versionId,randomUUID()]);
+      const receipt = (await pool.query("SELECT 'SUB'||id AS id,to_char(created_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS day FROM submissions WHERE identity_id=$1 AND problem_id=$2 ORDER BY id DESC LIMIT 1",[ids.fresh,p.id])).rows[0];
+      const daily = prefix+'/submissions/students/'+ids.fresh, day='?date='+receipt.day;
+      assert.ok((await request(daily+day,{auth:auth.admin})).data.items.some(row=>row.id===receipt.id && row.status==='AC'));
+      assert.deepEqual((await request(daily+'/'+receipt.id+day,{auth:auth.admin})).data,{code:'print(2)'});
       const grade = async () => (await request(path, student)).data.grade;
       assert.equal((await grade()).score, config.problems[0].points);
       assert.equal((await grade()).items[0].inherited,true);
@@ -606,6 +616,47 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.ok(!(await request(prefix + '/problem-banks', { auth: auth.student })).data.items.some(b => b.id === bank.id));
       await changeBank(auth.teacher, false, 2);
       assert.ok((await request(prefix + '/problem-banks', { auth: auth.student })).data.items.some(b => b.id === bank.id));
+    });
+    await t.test('only school administrators can read every school attempt and its own source on a Beijing calendar day', async()=>{
+      const base=prefix+'/submissions/students/'+ids.student;
+      const date='?date=2020-02-29', admin={auth:auth.admin};
+      const add=async(kind,instant,code,scope='school')=>{
+        const {rows:[job]}=await pool.query(`INSERT INTO school_judge_jobs
+          (school_id,problem_id,version_id,account_id,identity_id,kind,access_context,request_id,request_hash,payload,state,result,created_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,gen_random_uuid(),'qa',$8,'completed',$9,$10) RETURNING id`,
+          [school.id,p.id,published.versionId,users.student.id,scope==='school'?ids.student:null,kind,scope,
+           JSON.stringify({language:'python',code}),JSON.stringify({status:'WA',score:0}),instant]);
+        return job.id;
+      };
+      const first=await add('samples','2020-02-28T16:00:00Z','sample');
+      const repeated=await add('submit','2020-02-29T02:05:00Z','first source');
+      const again=await add('submit','2020-02-29T02:05:10Z','second source');
+      const last=await add('custom','2020-02-29T15:59:59.999999Z','custom');
+      await add('samples','2020-02-29T16:00:00Z','next date');
+      const privateJob=await add('samples','2020-02-29T02:10:00Z','private source','public');
+      const result=(await request(base+date,admin)).data;
+      assert.deepEqual(result.items.map(row=>row.id),[first,repeated,again,last]);
+      assert.equal(result.total,4);
+      assert.ok(result.items.every(row=>row.title==='Double' && row.status==='WA' && !('code' in row)));
+      for (const [id,code] of [[first,'sample'],[again,'second source'],[repeated,'first source'],[last,'custom']])
+        assert.deepEqual((await request(base+'/'+id+date,admin)).data,{code});
+      await request(base+'/'+privateJob+date,{...admin,status:404});
+      await request(prefix+'/submissions/students/'+ids.peer+'/'+first+date,{...admin,status:404});
+      await request(base+'?date=2021-02-29',{...admin,status:400});
+      assert.equal((await request(base+'?date=2020-02-28',admin)).data.total,0);
+      await pool.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,kind,access_context,
+        request_id,request_hash,payload,state,result,created_at)
+        SELECT $1,$2,$3,$4,$5,'samples','school',gen_random_uuid(),'qa','{}','completed','{"status":"CE"}','2020-02-29 08:00:00+08'
+        FROM generate_series(1,50)`,[school.id,p.id,published.versionId,users.student.id,ids.student]);
+      const pages=await Promise.all([1,2].map(page=>request(base+date+'&page='+page,admin)));
+      assert.deepEqual(pages.map(p=>p.data.items.length),[50,4]);
+      assert.equal(new Set(pages.flatMap(p=>p.data.items.map(row=>row.id))).size,54);
+      for(const suffix of [date,'/'+first+date]){
+        await request(base+suffix,{status:401});
+        for(const who of ['student','peer','teacher'])await request(base+suffix,{auth:auth[who],status:403});
+        await request(base+suffix,{auth:auth.outside,status:404});
+        await request('/schools/'+beta.id+'/submissions/students/'+ids.student+suffix,{auth:auth.outside,status:404});
+      }
     });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();

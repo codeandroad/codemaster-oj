@@ -130,7 +130,7 @@ export async function addAssignmentFeedback(db, a, user, identityId, problemId, 
   return { id: reviewId };
 }
 
-// Count using the same deadline, language and historical receipt rules as the matrix.
+// Completion follows learning progress, including late work. Official grades keep their cutoff.
 // Limit the aggregation to the visible page; no per-student grade queries on the list.
 export async function assignmentCompletionCounts(db, schoolId, ids, visibleJobSql) {
   if (!ids.length) return new Map();
@@ -145,13 +145,11 @@ export async function assignmentCompletionCounts(db, schoolId, ids, visibleJobSq
       SELECT 1 FROM school_judge_jobs j WHERE (j.school_id,j.identity_id,j.problem_id,j.version_id)=(part.school_id,part.identity_id,ap.problem_id,ap.version_id)
       AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
       AND (assignment.required_language IS NULL OR assignment.required_language=coalesce(j.payload->>'language','python'))
-      AND ((j.activity_id=assignment.id AND j.created_at<=coalesce(j.activity_deadline_at,'infinity')) OR (
+      AND (j.activity_id=assignment.id OR (
         j.activity_id IS DISTINCT FROM assignment.id AND ${visibleJobSql}
-        AND j.created_at<=coalesce(greatest(assignment.ends_at,part.extended_due_at),'infinity')
         AND (assignment.cancelled_at IS NULL OR j.created_at<=assignment.cancelled_at)))
     ) OR EXISTS (
       SELECT 1 FROM submissions previous WHERE previous.school_id=part.school_id AND ${assignmentPassingProgressSubmission}
-      AND previous.created_at<=coalesce(greatest(assignment.ends_at,part.extended_due_at),'infinity')
     ))
   ) completed GROUP BY completed.activity_id`,
     [schoolId, ids],

@@ -280,7 +280,6 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
  const quoteId=ctx.body.quoteId==null ? null : uuid(ctx.body.quoteId,'引用留言 ID');
  if (!quoteId && !publicPractice && !student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以留言');
  const own=publicPractice ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
- if (!quoteId && own) fail(400,'VALIDATION','不能给自己的主页留言');
  const mentionIds=ctx.body.mentionIds??[];
  const inlineMentions=ctx.body.mentions??[];
  if (!Array.isArray(mentionIds) || !Array.isArray(inlineMentions) || mentionIds.length+inlineMentions.length>5)

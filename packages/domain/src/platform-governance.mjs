@@ -182,7 +182,7 @@ function accountSchools({details = false} = {}) {
         THEN ARRAY[m.role,'school_admin'] ELSE ARRAY[m.role] END,
       'suspended',m.suspended
       ${details ? `, 'joinedAt',m.joined_at, 'identity',
-        CASE WHEN dossier.id IS NOT NULL THEN jsonb_build_object('name',dossier.name,'number',dossier.number) END` : ''}
+        CASE WHEN dossier.id IS NOT NULL THEN jsonb_build_object('id',dossier.id,'name',dossier.name,'number',dossier.number,'kind',dossier.kind) END` : ''}
     ) ORDER BY s.name,s.id),'[]'::jsonb)
     FROM school_memberships m JOIN schools s ON s.id=m.school_id
     ${details ? `LEFT JOIN school_identities dossier ON dossier.school_id=m.school_id

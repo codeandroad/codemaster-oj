@@ -240,6 +240,9 @@ function SchoolDirectory({
             <p>{person.username || (person.archivedAt ? "—" : text("Awaiting claim","待认领"))}</p>
             <div className="flex flex-wrap items-center gap-2">
               {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
+              {!person.archivedAt && person.kind==="student" && person.accountId &&
+                <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+person.id}>
+                  {text("View student profile","查看学生主页")}</AppLink>}
               {!person.archivedAt && person.kind!=="school_admin" && <>
                 <Button size="sm" variant="secondary" onClick={()=>person.accountId ? setUnlink(person) : setLink(person)}>{person.accountId ? text("Unlink","解除关联") : text("Link account","关联账号")}</Button>
                 {!person.accountId && <SchoolActivationButton school={school} identity={{...person,kind:person.kind}}/>}

@@ -104,7 +104,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
     {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
       <ProfileMessagesPanel sharing={showSharing &&
         <ProfileSharingControls accountId={viewer.id} resource={practice ? profile : schoolSharing}/>}>
-        <ProfileGuestbook key={base} base={base} peoplePath={schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`} canPost={!own && canWrite} refreshVersion={version}/>
+        <ProfileGuestbook key={base} base={base} peoplePath={schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`} canPost={canWrite} refreshVersion={version}/>
       </ProfileMessagesPanel>
 
       {showActivity && <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">

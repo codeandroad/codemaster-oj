@@ -220,7 +220,12 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
     {ok:true},'authors can remove their own message');
    assert.equal((await call(beta,notificationRoute)).body.total,0,'deleted source notification is hidden');
    await assert.rejects(call(beta,messageRoute,'POST',{body:'Second'}),e=>e.status===429);
-   await assert.rejects(call(alpha,messageRoute,'POST',{body:'Own'}),e=>e.status===400);
+   const selfPost=(await call(alpha,messageRoute,'POST',{body:'自己的留言'})).body;
+   assert.equal(selfPost.body,'自己的留言');
+   assert.equal(selfPost.canDelete,true,'profile owner can remove their own message');
+   assert.equal((await call(alpha,notificationRoute)).body.total,0,'profile owner receives no self notification');
+   assert.deepEqual((await call(alpha,`${messageRoute}/${selfPost.id}`,'DELETE')).body,{ok:true},
+    'profile owner can remove their own top-level message');
    await assert.rejects(call(teacher,messageRoute,'POST',{body:'Teacher'}),e=>e.status===403);
    const list=(await call(alpha,messageRoute)).body;
    assert.equal(list.total,1);

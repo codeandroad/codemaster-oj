@@ -99,7 +99,8 @@ function SchoolProblemWorkspace({ path, jobPath, backLabel, navigation, course, 
     presence:null, account:dirty=><ProblemWorkspaceAccount user={user} schoolId={problem.schoolId} staff={staff} dirty={dirty}/>,
     assistance:staff ? undefined : (kind,language)=><SchoolAssistance schoolId={problem.schoolId} preferredLanguage={language} kind={kind}
       target={{type:"problem",problemId:problem.id,versionId:problem.versionId!,activityId:a?.id}}/>,
-    statusBanner:(a || staff) && <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-2 text-sm">
+    statusBanner:<div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-2 text-sm">
+      {!staff && <span>{tx("校内练习的判题记录和当次代码对本校管理员可见。","Your school administrators can see each school run and its code.")}</span>}
       {a?.title}{staff && tx("教师试做 · 仅本人可见","Teacher preview · Personal results")}
       {a?.kind === "assignment" && a.canSubmit && a.endsAt && !staff && tx("截止后补交会更新进度，成绩与奖励以截止前提交为准。","Late work updates progress. Grades and rewards use submissions received by the deadline.")}
       {a && !a.preview && <SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={a.id}/>}

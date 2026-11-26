@@ -64,6 +64,7 @@ function safeReturn(value: string | null) { return value?.startsWith("/student/"
 /** Transport and navigation adapters share the full workspace UI, never its access rights. */
 export type ProblemWorkspaceAdapter = {
   context: string;
+  requestScope?: string;
   requiredLanguage?: SubmissionLanguage | null;
   languageScope?: "course" | "assignment";
   reloadLanguagePolicy?: () => void;
@@ -273,7 +274,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
       }
       setSubmissionId(null);
       const body = { problemId: problem.id, versionId: problem.versionId, publishedRevision: problem.publishedRevision, code, language, kind, ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}), ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}), ...(originalId ? { originalSubmissionId: originalId } : {}), ...(kind === "custom" ? { customInput } : {}) };
-      const signature = JSON.stringify(body), key = keys.current.get(signature) ?? productionId(); keys.current.set(signature, key);
+      const signature = JSON.stringify([adapter?.requestScope, body]), key = keys.current.get(signature) ?? productionId(); keys.current.set(signature, key);
       let accepted: {id: string};
       try {
         accepted = adapter ? await adapter.submit({kind, code, language, customInput, requestId: key}) : await productionApi<Submission>("submissions", { method: "POST", body: { ...body, idempotencyKey: key } });

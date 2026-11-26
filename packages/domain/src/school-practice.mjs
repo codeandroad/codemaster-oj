@@ -1,3 +1,4 @@
+import { publicRunSharing, sharingStudent } from './public-run-sharing.mjs';
 import { studentJudgingHistory } from './school-student-judging-history.mjs';
 import { lockPlatformContent } from './platform-content-access.mjs';
 import { schoolBankDirectory } from './school-bank-directory.mjs';
@@ -17,7 +18,7 @@ import { HttpError, bytes, canonicalHash, enumValue, fail, field, integer, uuid 
 import { validateTask } from '../judge.mjs';
 import { schoolProblemSubmissions } from './problem-submissions.mjs';
 import { publicProblemMetadata } from './problem-public-statements.mjs';
-import { handlePublicPracticeRecords } from './public-practice-records.mjs';
+import { handlePublicPracticeRecords, setPublicPracticeHistoryAccount } from './public-practice-records.mjs';
 import { publicPracticeLeaderboard } from './public-practice-leaderboard.mjs';
 import { customTutorial, saveTutorial, tutorialContext, tutorialSettings } from './problem-tutorials.mjs';
 import { loadSchoolCourse, schoolCourseProblemLanguage, schoolProblemCatalogCourses } from './school-courses.mjs';
@@ -138,7 +139,9 @@ async function enqueue(db,{schoolId,p,version,user,role,kind,body,accessContext}
  const code=kind==='validation'?version.definition.reference_code:bytes(body.code,'Code');
  const customInput=kind==='custom'?bytes(body.input??'','Input',262144):null;
  const validationRevision=kind==='validation'?p.revision:null;
- const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext,...course,...(preview&&{coursePreview:true}),...(validationRevision!=null&&{validationRevision})});
+ const classroom=accessContext==='public' && body.classroomSchoolId!=null ? uuid(body.classroomSchoolId).toLowerCase() : null;
+ const pupil=classroom ? await sharingStudent(db,classroom,user.id) : null;
+ const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext,...course,...(classroom && {classroom}),...(preview&&{coursePreview:true}),...(validationRevision!=null&&{validationRevision})});
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-submit:'||$1,0))",[user.id]);
  const old=(await db.query('SELECT * FROM school_judge_jobs WHERE account_id=$1 AND request_id=$2',[user.id,requestId])).rows[0];
  if(old){if(old.request_hash!==requestHash)fail(409,'REQUEST_CONFLICT','Request ID was used for another operation.');return {id:old.id,state:old.state};}
@@ -158,6 +161,11 @@ async function enqueue(db,{schoolId,p,version,user,role,kind,body,accessContext}
  try{validateTask(payload);}catch{fail(400,'INVALID_CASES','Invalid code, language or input.');}
  const identityId=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[schoolId,user.id])).rows[0]?.id:null;
  const job=(await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,validation_revision,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,clock_timestamp()) RETURNING id,state`,[schoolId,p.id,version.id,user.id,identityId??null,requestId,requestHash,kind,accessContext,JSON.stringify(payload),validationRevision])).rows[0];
+ if(classroom){
+  await setPublicPracticeHistoryAccount(db,user.id);
+  await db.query(`INSERT INTO school_public_run_shares(school_id,identity_id,account_id,source_school_id,job_id,visibility)
+   VALUES($1,$2,$3,$4,$5,'classroom')`,[classroom,pupil,user.id,schoolId,job.id]);
+ }
  return job;
 }
 async function projectJob(db,job){
@@ -441,6 +449,9 @@ async function importSchoolProblems(db, schoolId, user, role, body) {
 
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
+ const shared=route.match(/^\/practice\/run-sharing(?:\/([^/]+)\/([^/]+))?$/);
+ if(shared && (method==='GET' || method==='POST' && !shared[1]))
+  return publicRunSharing({pool,user,url,method,body,detail:shared[1]?shared.slice(1):null});
  const history=route.match(/^\/schools\/([^/]+)\/submissions\/students\/([^/]+)(?:\/([^/]+))?$/);
  if(history && method==='GET')return studentJudgingHistory({pool,user,school:history[1],identity:history[2],record:history[3],url});
  const isSubmission=method==='POST'&&/^\/practice\/problems\/[^/]+\/submissions$/.test(route);

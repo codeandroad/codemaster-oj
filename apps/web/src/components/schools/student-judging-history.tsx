@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppLink } from "@/components/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { State, panel, useData, kindLabel } from "@/components/student/data-state";
+import { State, panel, useData, useRefreshOnReturn, kindLabel } from "@/components/student/data-state";
 import { useLocale } from "@/components/locale-context";
 import { useSchoolText } from "./school-ui";
 
 const zone = "Asia/Shanghai";
 const beijingDate = new Intl.DateTimeFormat("sv-SE", {timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"});
 const beijingTime = new Intl.DateTimeFormat("en-GB", {timeZone:zone,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
-type Entry = {id:string; createdAt:string; kind:string; title:string; activity:string | null; status:string; language:string};
+type Entry = {id:string; createdAt:string; kind:string; title:string; activity:string | null; status:string; language:string; origin:"school"|"shared"|"classroom"; canViewCode:boolean};
 type History = {studentName:string; total:number; pageSize:number; items:Entry[]};
 
 function AttemptCode({path}: {path:string}) {
@@ -24,7 +24,9 @@ function AttemptCode({path}: {path:string}) {
 
 function DailyEntries({base, date}: {base:string; date:string}) {
   const [page,setPage] = useState(1);
-  return <HistoryPage key={page} base={base} date={date} page={page} setPage={setPage}/>;
+  const {version,refresh}=useRefreshOnReturn();
+  const text=useSchoolText();
+  return <><Button variant="secondary" className="mt-3" onClick={refresh}>{text("Refresh records","刷新记录")}</Button><HistoryPage key={page+":"+version} base={base} date={date} page={page} setPage={setPage}/></>;
 }
 
 function HistoryPage({base,date,page,setPage}: {base:string;date:string;page:number;setPage:(page:number)=>void}) {
@@ -38,14 +40,16 @@ function HistoryPage({base,date,page,setPage}: {base:string;date:string;page:num
     <p className="my-4 text-sm text-muted-foreground">{text(`${data.studentName} · ${data.total} records`, `${data.studentName} · 共 ${data.total} 条记录`)}</p>
     {!data.items.length && <p>{text("No judging records on this date.", "该日期没有判题记录。")}</p>}
     <ol className="divide-y divide-border">{data.items.map(item => <li key={item.id} className="py-3">
-      <button type="button" aria-expanded={open===item.id} onClick={()=>setOpen(open===item.id ? null : item.id)}
-        className="flex w-full flex-wrap items-baseline gap-x-4 gap-y-1 rounded text-left text-sm hover:bg-surface-subtle focus-visible:outline-primary">
+      <div
+        className="flex w-full flex-wrap items-baseline gap-x-4 gap-y-1 rounded text-left text-sm ">
         <time dateTime={item.createdAt} className="font-mono">{beijingTime.format(new Date(item.createdAt))}</time>
         <span className="min-w-32 flex-1"><strong>{item.title}</strong>{item.activity && <span className="block text-xs text-muted-foreground">{item.activity}</span>}</span>
+        <span>{item.origin==="shared" ? text("Public practice · Shared by student","公开练习 · 学生分享") : item.origin==="classroom" ? text("Public problem · Classroom practice","公开题目 · 课堂练习") : text("School practice","校内练习")}</span>
         <span>{kindLabel(item.kind,locale)}</span><strong>{item.status}</strong>
-        <span className="text-primary">{open===item.id ? text("Hide code","收起代码") : text("View code","查看代码")}</span>
-      </button>
-      {open===item.id && <div className="mt-2"><span className="text-xs text-muted-foreground">{item.language}</span>
+        {item.canViewCode ? <button type="button" aria-expanded={open===item.id} onClick={()=>setOpen(open===item.id ? null : item.id)} className="text-primary underline">
+          {open===item.id ? text("Hide code","收起代码") : text("View code","查看代码")}</button> : <span>{text("Summary only","仅分享摘要")}</span>}
+      </div>
+      {item.canViewCode && open===item.id && <div className="mt-2"><span className="text-xs text-muted-foreground">{item.language}</span>
         <AttemptCode key={item.id} path={base+"/"+encodeURIComponent(item.id)+query}/></div>}
     </li>)}</ol>
     {data.total>data.pageSize && <nav aria-label={text("Judging history pages","判题记录分页")} className="mt-4 flex items-center justify-end gap-2 text-sm">

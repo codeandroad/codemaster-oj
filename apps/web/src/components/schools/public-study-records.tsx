@@ -6,6 +6,9 @@ import { State, useData } from "@/components/student/shared";
 import { publicSubmissionContext, submissionVerdicts } from "@/components/student/submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { reviewNotebookState, type ReviewNotebookFilter } from "@/components/student/review-notebook-state";
+import { AppLink } from "@/components/navigation";
+import { buttonVariants } from "@/components/ui/button";
+import { PublicRunSharing } from "./public-run-sharing";
 import { CorrectionNote } from "./correction-note";
 import { SchoolSubmissionDetail, StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
 import { useSchoolText } from "./school-ui";
@@ -70,8 +73,12 @@ export function LearnerRecords({ notebook, schoolId: workspace }: { notebook: bo
         <CorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
     />;
   }
-  return <PublicRecordsList schoolId={workspace} key={`${workspace}:${notebook}:${page}:${verdict}:${context}:${reviewState}`} notebook={notebook} page={page}
-    verdict={verdict} context={context} reviewState={reviewState} href={href} />;
+  if (!notebook && search.get("runSharing") === "1")
+    return <PublicRunSharing backHref={href({runSharing:null,date:null})} initialSchool={workspace ?? search.get("schoolId")}/>;
+  return <>{!notebook && <AppLink className={buttonVariants({variant:"secondary"})} href={href({runSharing:"1"})}>
+    {text("Public practice run sharing","公开练习记录与分享")}
+  </AppLink>}<PublicRecordsList schoolId={workspace} key={`${workspace}:${notebook}:${page}:${verdict}:${context}:${reviewState}`} notebook={notebook} page={page}
+    verdict={verdict} context={context} reviewState={reviewState} href={href} /></>;
 }
 
 function PublicRecordsList({ schoolId, notebook, page, verdict, context, reviewState, href }: {

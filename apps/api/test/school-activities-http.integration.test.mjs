@@ -108,6 +108,84 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     await processSchoolOne({ pool: worker, judge: { judge: async () => completed } });
     const published = (await request(prefix + '/problems/' + p.id + '/publish', { auth: auth.admin, method: 'POST', body: { expectedRevision: 1 } })).data;
     await request('/platform/problem-publications', { auth: auth.admin, method: 'POST', body: { schoolId: school.id, problemId: p.id, versionId: published.versionId } });
+    await t.test('personal public runs require per-recipient consent for each receipt and separate code permission', async()=>{
+      // The public problem lives at school A. This school B has a different student dossier.
+      const recipient=beta.id, account=users.fresh.id, dossier=randomUUID();
+      await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')",[recipient,account]);
+      await pool.query("INSERT INTO school_identities(school_id,id,account_id,kind,name,number) VALUES($1,$2,$3,'student','Test B','B-share')",[recipient,dossier,account]);
+      const list='/practice/run-sharing', day='2020-04-03', q='?date='+day;
+      const mine={auth:auth.fresh}, adminB={auth:auth.outside};
+      const history='/schools/'+recipient+'/submissions/students/'+dossier;
+      const historyA=prefix+'/submissions/students/'+ids.fresh;
+      const add=async(kind,code,user=account)=>{
+        const inserted=await pool.query(`INSERT INTO school_judge_jobs
+          (school_id,problem_id,version_id,account_id,kind,access_context,request_id,request_hash,payload,state,result,created_at)
+          VALUES($1,$2,$3,$4,$5,'public',gen_random_uuid(),'qa',$6,'completed','{"status":"WA"}','2020-04-03 09:20:00+08') RETURNING id`,
+          [school.id,p.id,published.versionId,user,kind,JSON.stringify({version:{title:'Double'},language:'python',code})]);
+        return school.id+':'+inserted.rows[0].id;
+      };
+      const keys=[await add('samples','sample A'),await add('samples','sample B'),await add('custom','custom'),await add('submit','formal')];
+      const foreign=await add('samples','peer sample',users.peer.id);
+      const change=(records,visibility,opts={})=>request(list,{...mine,method:'POST',body:{schoolId:recipient,date:day,records,visibility},...opts});
+      const adminCode=(key,status=200)=>request(history+'/PUB-'+key+q,{...adminB,status});
+      const ownCode=list+'/'+keys[0].replace(':','/');
+      assert.equal((await request(ownCode,mine)).data.code,'sample A');
+      await request(ownCode,{auth:auth.peer,status:404});
+      assert.equal((await request(history+q,adminB)).data.total,0);
+      assert.equal((await request(historyA+q,{auth:auth.admin})).data.total,0);
+      const own=(await request(list+q+'&schoolId='+recipient,mine)).data.items;
+      assert.deepEqual(own.map(r=>r.id).sort(),[...keys].sort());
+      assert.ok(own.every(r=>r.visibility==='private' && !('code' in r)));
+      await change(keys,'summary',{csrf:false,status:403});
+      await change(keys,'code',{auth:auth.admin,status:403});
+      await change(keys,'code',{auth:auth.peer,status:403});
+      await change([...keys,foreign],'code',{status:404});
+      assert.equal((await request(history+q,adminB)).data.total,0);
+      await change(keys,'summary');
+      const snapshot=(await request(history+q,adminB)).data;
+      assert.equal(snapshot.total,4);
+      assert.ok(snapshot.items.every(r=>r.origin==='shared' && r.title==='Double' && !r.canViewCode && !('code' in r)));
+      const later=await add('samples','later');
+      assert.equal((await request(history+q,adminB)).data.total,4);
+      await adminCode(keys[0],404);
+      await change([keys[0]],'code');
+      assert.deepEqual((await adminCode(keys[0])).data,{code:'sample A'});
+      await adminCode(keys[1],404);
+      await request(historyA+'/PUB-'+keys[0]+q,{auth:auth.admin,status:404});
+      await change([keys[0]],'summary');
+      await adminCode(keys[0],404);
+      await change(keys,'private');
+      assert.equal((await request(history+q,adminB)).data.total,0);
+      await adminCode(keys[0],404);
+      await change([later],'code');
+      await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2',[recipient,account]);
+      await pool.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2',[recipient,account]);
+      assert.equal((await request(history+q,adminB)).data.total,0);
+      await assert.rejects(worker.query('SELECT * FROM school_public_run_shares'),{code:'42501'});
+
+      const path='/practice/problems/'+p.id, live=(await request(path+'?view=practice',mine)).data;
+      const body={kind:'samples',language:'python',code:'def solve(data): return data*2',versionId:live.versionId,
+        publishedRevision:live.publishedRevision,requestId:randomUUID(),classroomSchoolId:recipient};
+      const send=(body,status=202)=>request(path+'/submissions',{...mine,method:'POST',body,status});
+      const receipt=(await send(body)).data, key=school.id+':'+receipt.id;
+      assert.equal((await send(body)).data.id,receipt.id);
+      await send({...body,classroomSchoolId:null},409);
+      await send({...body,requestId:randomUUID(),classroomSchoolId:randomUUID()},403);
+      const current=(await pool.query("SELECT to_char(created_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS day FROM school_judge_jobs WHERE id=$1",[receipt.id])).rows[0].day;
+      const today='?date='+current;
+      const receiptRow=(await request(history+today,adminB)).data.items.find(r=>r.id==='PUB-'+key);
+      assert.ok(receiptRow?.canViewCode && receiptRow.origin==='classroom');
+      assert.deepEqual((await request(history+'/PUB-'+key+today,adminB)).data,{code:body.code});
+      await request(historyA+'/PUB-'+key+today,{auth:auth.admin,status:404});
+      for(const schoolId of [recipient,school.id]) await request(list,{...mine,method:'POST',status:404,
+        body:{schoolId,date:current,records:[key],visibility:'summary'}});
+      const personal=(await send({...body,requestId:randomUUID(),classroomSchoolId:null})).data;
+      await request(history+'/PUB-'+school.id+':'+personal.id+today,{...adminB,status:404});
+      for (const id of [receipt.id,personal.id]) {
+        await processSchoolOne({pool:worker,judge:{judge:async()=>completed}});
+        assert.equal((await pool.query('SELECT state FROM school_judge_jobs WHERE id=$1',[id])).rows[0].state,'completed');
+      }
+    });
     const config = { kind: 'timed', title: 'Timed assessment', description: '', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), durationMinutes: 30, problems: [{ problemId: p.id, versionId: published.versionId, points: 50 }], identityIds: [ids.student, ids.peer], requestId: randomUUID() };
     await t.test('assignment reward and draft save atomically with retry and revision protection', async () => {
       const post = { auth: auth.teacher, method: 'POST' };

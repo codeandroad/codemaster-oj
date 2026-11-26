@@ -1410,7 +1410,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                         return (
                           <td
                             key={p.problemId}
-                            className="border-l border-border text-center"
+                            className="relative border-l border-border text-center"
                           >
                             <button
                               disabled={cell?.completionSource === "other_entry" && !(schoolId && cell.assignmentAttempts)}
@@ -1423,18 +1423,23 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <span className={lateWork ? "text-yellow-500 dark:text-yellow-300" : undefined}>
-                                <b>{cell?.status ?? "—"}</b>
-                                {lateWork && <span className="block text-xs font-semibold">{ui(locale, "晚提交", "Late submission")}</span>}
-                                <span className={lateWork ? "block text-xs" : "block text-xs text-muted-foreground"}>
-                                  {cell?.completionSource === "other_entry" && <span className="block">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
-                                  {cell?.firstAcceptedAt && (
-                                    <span className="block">
-                                      {ui(locale, "首次通过", "First accepted")}{" "}
-                                      <time dateTime={cell.firstAcceptedAt}>{submissionTime.format(new Date(cell.firstAcceptedAt))}</time>
-                                    </span>
-                                  )}
-                                </span>
+                              <b className={lateWork ? "block px-6" : "block"}>{cell?.status ?? "—"}</b>
+                              {lateWork && (
+                                <>
+                                  <span aria-hidden="true" title={ui(locale, "晚提交", "Late submission")} className="absolute right-2 top-1.5 text-xs font-bold leading-none text-yellow-500 dark:text-yellow-300">
+                                    {ui(locale, "晚", "Late")}
+                                  </span>
+                                  <span className="sr-only">{ui(locale, "晚提交", "Late submission")}</span>
+                                </>
+                              )}
+                              <span className="block text-xs text-muted-foreground">
+                                {cell?.completionSource === "other_entry" && <span className="block">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
+                                {cell?.firstAcceptedAt && (
+                                  <span className="block">
+                                    {ui(locale, "首次通过", "First accepted")}{" "}
+                                    <time dateTime={cell.firstAcceptedAt}>{submissionTime.format(new Date(cell.firstAcceptedAt))}</time>
+                                  </span>
+                                )}
                               </span>
                             </button>
                           </td>

@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
+  CalendarClock,
   Pencil,
   Plus,
   Send,
@@ -24,6 +25,7 @@ import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/components/scholarship/teaching-page";
 import { useLocale, type AppLocale } from "@/components/locale-context";
+import { date as formatDeadline } from "@/components/student/data-state";
 import { languageInfo, requiredLanguageText } from "@/components/student/languages";
 import {
   productionApi,
@@ -1280,29 +1282,39 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
       <PageHeader
         eyebrow="作业进度"
         title={`${assignment?.title ?? ui(locale, "作业", "Assignment")} · ${ui(locale, "进度", "Progress Matrix")}`}
-        description={
-          assignment
-            ? ui(locale, `${grades.length} 名适用学生 · 截止 ${date(assignment.dueAt)}。订正记录不会覆盖作业原成绩。`, `${grades.length} applicable students · Due ${date(assignment.dueAt)}. Corrections do not overwrite the original grade.`)
-            : ui(locale, "正在读取学生进度。", "Loading student progress.")
-        }
         action={
-          <div className="flex flex-wrap gap-2">
-            {schoolId && <>
-              <Link href={schoolWorkspaceHref(schoolId,"assignments","teacher")} className={buttonVariants({variant:"secondary"})}>{ui(locale,"返回作业列表","Back to assignments")}</Link>
-              <Link href={schoolWorkspaceHref(schoolId,"reports","teacher")+`&activityId=${id}`} className={buttonVariants({variant:"secondary"})}>{ui(locale,"教学报告与导出","Report and export")}</Link>
-            </>}
-            {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress" schoolId={schoolId}/>}
-            {assignment?.canManage && assignment.published && !assignment.archived && <>
-              <Button variant="secondary" onClick={() => setManage(true)}>{ui(locale, "延期 / 豁免", "Extend / exempt")}</Button>
-              <CancelAssignment path={base} title={assignment.title} onSaved={resource.reload}/>
-            </>}
-            <Link
-              href={assignmentHref(schoolId,id,"edit")}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              {ui(locale, "编辑作业", "Edit assignment")}
-            </Link>
-          </div>
+          <>
+            {assignment && (
+              <div className="mr-auto flex items-center gap-2.5 py-1">
+                <CalendarClock aria-hidden="true" size={20} className="shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{ui(locale, "作业截止时间", "Assignment deadline")}</p>
+                  {assignment.dueAt ? (
+                    <time dateTime={assignment.dueAt} className="text-lg font-semibold tabular-nums">
+                      {formatDeadline(assignment.dueAt, locale)} <span className="text-xs font-normal text-muted-foreground">UTC+8</span>
+                    </time>
+                  ) : <p className="font-semibold">{ui(locale, "无截止时间", "No deadline")}</p>}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {schoolId && <>
+                <Link href={schoolWorkspaceHref(schoolId,"assignments","teacher")} className={buttonVariants({variant:"secondary"})}>{ui(locale,"返回作业列表","Back to assignments")}</Link>
+                <Link href={schoolWorkspaceHref(schoolId,"reports","teacher")+`&activityId=${id}`} className={buttonVariants({variant:"secondary"})}>{ui(locale,"教学报告与导出","Report and export")}</Link>
+              </>}
+              {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress" schoolId={schoolId}/>}
+              {assignment?.canManage && assignment.published && !assignment.archived && <>
+                <Button variant="secondary" onClick={() => setManage(true)}>{ui(locale, "延期 / 豁免", "Extend / exempt")}</Button>
+                <CancelAssignment path={base} title={assignment.title} onSaved={resource.reload}/>
+              </>}
+              <Link
+                href={assignmentHref(schoolId,id,"edit")}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                {ui(locale, "编辑作业", "Edit assignment")}
+              </Link>
+            </div>
+          </>
         }
       />
       <State resource={resource} />
@@ -1408,15 +1420,14 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <b className={lateWork ? "text-warning" : undefined}>{cell?.status ?? "—"}</b>
-                              {lateWork && <span className="block text-xs font-medium text-warning">{ui(locale, "含截止后记录", "Includes late work")}</span>}
-                              {cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
-                              <p className={`text-xs ${lateWork ? "text-warning" : "text-muted-foreground"}`}>
-                                {cell?.score === null ||
-                                cell?.score === undefined
-                                  ? "—"
-                                  : `${((cell.score * p.points) / 100).toFixed(2)} / ${p.points}`}
-                              </p>
+                              <span className={lateWork ? "inline-block rounded-md bg-neutral-800 px-2.5 py-1 text-yellow-300" : "inline-block"}>
+                                <b>{cell?.status ?? "—"}</b>
+                                {lateWork && <span className="block text-xs font-semibold">{ui(locale, "晚提交", "Late submission")}</span>}
+                                <span className={lateWork ? "block text-xs" : "block text-xs text-muted-foreground"}>
+                                  {cell?.completionSource === "other_entry" && <span className="block">{ui(locale, "已在其他入口通过", "Passed elsewhere")}</span>}
+                                  {cell?.score == null ? "—" : `${((cell.score * p.points) / 100).toFixed(2)} / ${p.points}`}
+                                </span>
+                              </span>
                             </button>
                           </td>
                         );

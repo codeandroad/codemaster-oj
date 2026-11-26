@@ -25,6 +25,7 @@ interface Message {
   liked: boolean;
 }
 interface MessagesPage {
+  acceptingMessages: boolean;
   items: Message[];
   total: number;
   replyTotal: number;
@@ -209,7 +210,7 @@ function MessageBody({ item, peoplePath }: { item: Message; peoplePath: string }
 
 function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, children }: {
   item: Message; base: string; peoplePath: string; readOnly: boolean;
-  onReply: (item: Message, trigger: HTMLButtonElement) => void;
+  onReply?: (item: Message, trigger: HTMLButtonElement) => void;
   onDelete: (item: Message, trigger: HTMLButtonElement) => void;
   children?: React.ReactNode;
 }) {
@@ -248,9 +249,9 @@ function MessageRow({ item, base, peoplePath, readOnly, onReply, onDelete, child
           }}>
           <Heart size={15} fill={liked ? "currentColor" : "none"} aria-hidden="true"/>{zh ? "赞" : "Like"}{likeCount > 0 && <span className="tabular-nums">{likeCount}</span>}
         </Button>
-        <Button type="button" variant="ghost" size="sm" className={actionClass} onClick={event => onReply(item, event.currentTarget)}>
+        {onReply && <Button type="button" variant="ghost" size="sm" className={actionClass} onClick={event => onReply(item, event.currentTarget)}>
           <Quote size={15} aria-hidden="true"/>{zh ? "引用回复" : "Quote reply"}
-        </Button>
+        </Button>}
         {item.canDelete && <Button type="button" variant="ghost" size="sm" className={`${actionClass} hover:text-destructive`} onClick={event => onDelete(item, event.currentTarget)}>
           <Trash2 size={15} aria-hidden="true"/>{zh ? "删除" : "Delete"}
         </Button>}
@@ -272,8 +273,8 @@ function Paging({ page, total, onChange }: { page: number; total: number; onChan
   </div>;
 }
 
-function Thread({ item, base, peoplePath, readOnly, version, onDelete, changed }: {
-  item: Message; base: string; peoplePath: string; readOnly: boolean; version: number;
+function Thread({ item, base, peoplePath, readOnly, acceptingMessages, version, onDelete, changed }: {
+  item: Message; base: string; peoplePath: string; readOnly: boolean; acceptingMessages: boolean; version: number;
   onDelete: (item: Message, trigger: HTMLButtonElement) => void; changed: () => void;
 }) {
   const { locale } = useLocale();
@@ -292,8 +293,8 @@ function Thread({ item, base, peoplePath, readOnly, version, onDelete, changed }
   function endReply() {
     setQuote(null); returnFocus.current?.focus();
   }
-  return <MessageRow {...{ item, base, peoplePath, readOnly, onDelete }} onReply={beginReply}>
-    {quote && <Composer key={quote.id} base={base} quote={quote} onCancel={endReply} onSaved={() => {
+  return <MessageRow {...{ item, base, peoplePath, readOnly, onDelete }} onReply={acceptingMessages ? beginReply : undefined}>
+    {quote && acceptingMessages && <Composer key={quote.id} base={base} quote={quote} onCancel={endReply} onSaved={() => {
       endReply(); setPage(1); setExpanded(true); changed();
     }}/>}
     {item.replyCount > 0 && <Button type="button" size="sm" variant="ghost" className="mt-1 px-2 text-primary" aria-expanded={expanded}
@@ -303,7 +304,7 @@ function Thread({ item, base, peoplePath, readOnly, version, onDelete, changed }
     {expanded && item.replyCount > 0 && <div className="mt-2 border-l border-border pl-2 sm:pl-3">
       <State data={{ ...replies, data: currentReplies, loading: replies.loading || (!currentReplies && !replies.error) }}>
         <ol className="divide-y divide-border">{currentReplies?.items.map(reply => <li key={reply.id} className="py-2">
-          <MessageRow item={reply} {...{ base, peoplePath, readOnly, onDelete }} onReply={beginReply}/>
+          <MessageRow item={reply} {...{ base, peoplePath, readOnly, onDelete }} onReply={acceptingMessages ? beginReply : undefined}/>
         </li>)}</ol>
         <Paging page={page} total={item.replyCount} onChange={setPage}/>
       </State>
@@ -325,6 +326,7 @@ export function ProfileGuestbook({ base, peoplePath, canPost, readOnly = false, 
   const cancel = useRef<HTMLButtonElement>(null);
   const messages = useData<MessagesPage>(`${base}/messages?page=${page}&pageSize=${pageSize}`, version + refreshVersion);
   const data = messages.data?.page === page ? messages.data : null;
+  const acceptingMessages = messages.data?.acceptingMessages === true;
   const deletion = useMutation();
   const changed = () => setVersion(current => current + 1);
   useEffect(() => {
@@ -337,11 +339,12 @@ export function ProfileGuestbook({ base, peoplePath, canPost, readOnly = false, 
         : `${data.total} ${data.total === 1 ? "message" : "messages"} · ${data.replyTotal} ${data.replyTotal === 1 ? "reply" : "replies"}`}</span> : <span/>}
       <Button type="button" variant="ghost" size="sm" disabled={messages.loading} onClick={changed}>{zh ? "刷新留言" : "Refresh messages"}</Button>
     </div>
-    {canPost && <Composer base={base} onSaved={() => { setPage(1); changed(); }}/>}
+    {messages.data?.acceptingMessages === false && <p className="mt-3 text-sm text-muted-foreground">{zh ? "已关闭新留言和回复。" : "New messages and replies are closed."}</p>}
+    {canPost && acceptingMessages && <Composer base={base} onSaved={() => { setPage(1); changed(); }}/>}
     {notice && <p role="status" className="mt-2 text-sm text-success">{notice}</p>}
     <State data={{ ...messages, data, loading: messages.loading || (!data && !messages.error) }}>
       {data?.items.length ? <ol className="mt-2 divide-y divide-border border-t border-border">
-        {data.items.map(item => <li key={item.id} className="py-3"><Thread {...{ item, base, peoplePath, readOnly, changed }}
+        {data.items.map(item => <li key={item.id} className="py-3"><Thread {...{ item, base, peoplePath, readOnly, acceptingMessages, changed }}
           version={version + refreshVersion} onDelete={(message, trigger) => {
             deletion.reset(); setNotice(""); target.current = trigger; setSelected(message);
           }}/></li>)}

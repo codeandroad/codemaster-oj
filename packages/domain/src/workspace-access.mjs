@@ -14,6 +14,8 @@ const SHARED_ENDPOINTS = new Set([
   'PATCH /auth/profile',
   'GET /auth/default-workspace',
   'PATCH /auth/default-workspace',
+  'GET /account/guestbook-settings',
+  'PATCH /account/guestbook-settings',
 ]);
 
 export async function requireWorkspaceRoute(user, route, method) {

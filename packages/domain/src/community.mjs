@@ -22,6 +22,38 @@ function withGuestbookTransaction(ctx,work) {
  return ctx.inSchoolTransaction ? work(ctx.pool) : transaction(ctx.pool,work);
 }
 
+// There may be no preference row to lock. Serialize closing a guestbook with
+// new posts to the same owner and scope, including replies.
+function lockGuestbook(db, accountId, scope, exclusive) {
+ const lock = exclusive ? 'pg_advisory_xact_lock' : 'pg_advisory_xact_lock_shared';
+ return db.query(`SELECT ${lock}(hashtextextended('guestbook:' || $1::text || ':' || $2::text, 0))`, [accountId, scope]);
+}
+
+async function acceptsMessages(db, accountId, scope) {
+ const {rowCount} = await db.query('SELECT 1 FROM closed_guestbooks WHERE account_id=$1 AND scope=$2', [accountId, scope]);
+ return rowCount === 0;
+}
+
+async function guestbookSettings(ctx) {
+ const accountId = ctx.user.id;
+ return transaction(ctx.pool, async db => {
+  await activeAccount(db, accountId);
+  if (ctx.method === 'PATCH') {
+   const scope = enumValue(ctx.body.scope, ['school','practice'], '留言范围');
+   const open = ctx.body.open;
+   if (typeof open !== 'boolean') fail(400,'VALIDATION','请选择是否接受新留言');
+   await lockGuestbook(db, accountId, scope, true);
+   if (open) await db.query('DELETE FROM closed_guestbooks WHERE account_id=$1 AND scope=$2', [accountId,scope]);
+   else await db.query('INSERT INTO closed_guestbooks(account_id,scope) VALUES($1,$2) ON CONFLICT DO NOTHING', [accountId,scope]);
+  }
+  const {rows:[settings]} = await db.query(`SELECT
+   NOT EXISTS(SELECT 1 FROM closed_guestbooks WHERE account_id=$1 AND scope='school') AS "schoolOpen",
+   NOT EXISTS(SELECT 1 FROM closed_guestbooks WHERE account_id=$1 AND scope='practice') AS "practiceOpen",
+   EXISTS(SELECT 1 FROM public_practice_preferences WHERE account_id=$1 AND profile_enabled) AS "profileEnabled"`, [accountId]);
+  return response(settings);
+ });
+}
+
 function paging(url) {
  const number = (key, fallback, max) => {
   const raw = url.searchParams.get(key) ?? String(fallback);
@@ -200,6 +232,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
   if (typeof enabled!=='boolean') fail(400,'VALIDATION','Choose whether to share your practice profile.');
   return withGuestbookTransaction(ctx,async db=>{
    await activeAccount(db,user.id);
+   await lockGuestbook(db,user.id,'practice',true);
    await db.query(`INSERT INTO public_practice_preferences(account_id,profile_enabled) VALUES($1,$2)
     ON CONFLICT(account_id) DO UPDATE SET profile_enabled=EXCLUDED.profile_enabled`,[user.id,enabled]);
    return response({profileEnabled:enabled});
@@ -208,9 +241,9 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  const target=await practiceProfileTarget(ctx.pool,user,accountId,method==='DELETE');
  if (section==='mentions' && method==='GET') return listMentionCandidates(ctx,target.identity_id,accountId);
  if (section==='messages') {
-  if (!messageId && method==='GET') return listMessages(ctx,target.identity_id,accountId);
+  if (!messageId && method==='GET') return listMessages(ctx,target.identity_id,accountId,{publicPractice:true});
   if (!messageId && method==='POST') return createMessage(ctx,target.identity_id,accountId);
-  if (action==='replies' && method==='GET') return listMessages(ctx,target.identity_id,accountId,messageId);
+  if (action==='replies' && method==='GET') return listMessages(ctx,target.identity_id,accountId,{publicPractice:true,threadId:messageId});
   if (action==='like' && method==='POST') return reactToMessage(ctx,target.identity_id,messageId,accountId);
   if (messageId && !action && method==='DELETE') return deleteMessage(ctx,target.identity_id,messageId,accountId);
   return null;
@@ -238,8 +271,8 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  });
 }
 
-async function listMessages(ctx, identityId, practiceAccountId = null, threadId = null, readOnly = false) {
- const publicPractice=practiceAccountId!==null;
+async function listMessages(ctx, identityId, ownerAccountId, {publicPractice=false, threadId=null, readOnly=false} = {}) {
+ const practiceAccountId=publicPractice ? ownerAccountId : null;
  const {page,pageSize} = paging(ctx.url);
  const own=publicPractice ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
  const params=[identityId,ctx.user.id,own,practiceAccountId];
@@ -276,6 +309,7 @@ async function listMessages(ctx, identityId, practiceAccountId = null, threadId 
   if (readOnly) message.canDelete=false;
   return message;
  }),
+  acceptingMessages:await acceptsMessages(ctx.pool,ownerAccountId,publicPractice ? 'practice' : 'school'),
   total:rows[0].total,replyTotal:rows[0].reply_total,page,pageSize});
 }
 
@@ -300,7 +334,11 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
  if (/(?:https?:\/\/|www\.)/iu.test(body))
   fail(400,'VALIDATION','留言不支持外部链接');
  const created=await withGuestbookTransaction(ctx,async db=>{
+  if (publicPractice) await lockGuestbook(db,practiceAccountId,'practice',false);
   const profile=await guestbookProfile(db,ctx,identityId,practiceAccountId);
+  if (!publicPractice) await lockGuestbook(db,profile.account_id,'school',false);
+  if (!await acceptsMessages(db,profile.account_id,publicPractice ? 'practice' : 'school'))
+   fail(403,'GUESTBOOK_CLOSED','此主页已关闭新留言和回复。');
   const params=[identityId,ctx.user.id,own,practiceAccountId];
   const quote=quoteId ? await visibleMessage(db,params,quoteId,{lock:true}) : null;
   const threadId=quote ? quote.thread_id??quote.id : null;
@@ -487,6 +525,7 @@ async function dismissReport(ctx, reportId, publicPractice = false) {
 }
 
 export async function handleCommunity(ctx) {
+ if (ctx.route==='/account/guestbook-settings' && ['GET','PATCH'].includes(ctx.method)) return guestbookSettings(ctx);
  const scoped=ctx.route.match(/^\/schools\/([^/]+)(\/(?:profiles|profile-message-reports)(?:\/.*)?)$/);
  if(scoped)return transaction(ctx.pool,async db=>{
   const schoolId=uuid(scoped[1]);
@@ -505,7 +544,7 @@ export async function handleCommunity(ctx) {
   const readProfile=(context,target)=>{
    if (!section) return profile(context,target);
    if (section==='activity') return activity(context,target);
-   return listMessages(context,target.id,null,threadId,Boolean(previewSchool));
+   return listMessages(context,target.id,target.account_id,{threadId,readOnly:Boolean(previewSchool)});
   };
   if (!previewSchool) return readProfile(ctx,await visibleProfile(ctx.pool,ctx.user,identityId));
   const schoolId=uuid(previewSchool,'学校 ID');

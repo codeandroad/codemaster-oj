@@ -9,6 +9,15 @@ import { applyResponse } from '../domain.response.js';
 export class CommunityController {
  constructor(private readonly domain: DomainService) {}
 
+ @Get('account/guestbook-settings')
+ async guestbookSettings(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+ @Patch('account/guestbook-settings')
+ async updateGuestbookSettings(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+
  @Get('practice/presence')
  async publicPresence(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('publicPresence',request.domainContext));

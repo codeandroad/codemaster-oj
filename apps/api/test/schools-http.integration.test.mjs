@@ -399,6 +399,58 @@ test('school claims and reviewed applications stay within each school on the rea
       });
       assert.equal(attempts.status,200);
       assert.equal((await post(path(beta),another,memberFacts)).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
+
+      await t.test('closing either guestbook preserves its threads and independently blocks new messages and replies', async () => {
+        const settings = '/account/guestbook-settings';
+        const schoolBook = '/schools/'+alpha.id+'/profiles/'+local.id+'/messages';
+        const practiceProfile = '/practice/profiles/'+learner.data.user.id;
+        const practiceBook = practiceProfile+'/messages';
+        const patch = (scope,open,auth=learner,csrf=true) => request(settings,{method:'PATCH',auth,csrf,body:{scope,open}});
+        const add = async (book,auth,body,quoteId) => {
+          const result = await post(book,auth,{body,quoteId});
+          assert.equal(result.status,201,JSON.stringify(result.data.error));
+          return result.data.id;
+        };
+        assert.equal((await request(settings)).status,401);
+        assert.equal((await patch('school',false,learner,false)).status,403);
+        assert.equal((await patch('school','false')).status,400);
+        assert.equal((await patch('other',true)).status,400);
+        assert.deepEqual((await request(settings,{auth:learner})).data,{schoolOpen:true,practiceOpen:true,profileEnabled:false});
+        assert.equal((await request(practiceBook,{auth:another})).status,404);
+        assert.equal((await request(practiceProfile,{method:'PATCH',auth:learner,body:{profileEnabled:true}})).status,200);
+
+        const schoolRoot = await add(schoolBook,learner,'School message');
+        const schoolReply = await add(schoolBook,alphaAdmin,'School reply',schoolRoot);
+        for (let attempt=0; attempt<2; attempt++) {
+          assert.deepEqual((await patch('school',false)).data,{schoolOpen:false,practiceOpen:true,profileEnabled:true});
+        }
+        const publicRoot = await add(practiceBook,another,'Practice message');
+        const publicReply = await add(practiceBook,platform,'Practice reply',publicRoot);
+        assert.deepEqual((await patch('practice',false)).data,{schoolOpen:false,practiceOpen:false,profileEnabled:true});
+
+        for (const [book,reader,root,reply] of [[schoolBook,alphaAdmin,schoolRoot,schoolReply],[practiceBook,another,publicRoot,publicReply]]) {
+          const history = (await request(book,{auth:reader})).data;
+          assert.equal(history.acceptingMessages,false);
+          assert.deepEqual(history.items.map(item=>[item.id,item.replyCount]),[[root,1]]);
+          const replies = (await request(book+'/'+root+'/replies',{auth:reader})).data;
+          assert.deepEqual(replies.items.map(item=>item.id),[reply]);
+          for (const [author,quoteId] of [[learner,null],[reader,root],[learner,reply]]) {
+            const denied = await post(book,author,{body:'Closed',quoteId});
+            assert.equal(denied.status,403);
+            assert.equal(denied.data.error.code,'GUESTBOOK_CLOSED');
+          }
+        }
+        assert.equal((await request('/schools/'+beta.id+'/profiles/'+foreign.id+'/messages',{auth:betaAdmin})).data.acceptingMessages,false);
+        assert.equal((await request(schoolBook,{auth:betaAdmin})).status,404);
+        assert.equal((await request(settings,{auth:another})).data.practiceOpen,true);
+
+        assert.deepEqual((await patch('school',true)).data,{schoolOpen:true,practiceOpen:false,profileEnabled:true});
+        const reviewer = await registerPersonal(request,'guestbook-reviewer',password);
+        assert.ok((await post('/platform/schools/'+alpha.id+'/administrators',platform,{username:'guestbook-reviewer'})).status<300);
+        await add(schoolBook,reviewer,'Reopened school reply',schoolRoot);
+        assert.deepEqual((await patch('practice',true)).data,{schoolOpen:true,practiceOpen:true,profileEnabled:true});
+        await add(practiceBook,betaAdmin,'Reopened practice message');
+      });
     } finally {
       await app?.close();
       await pool.end();

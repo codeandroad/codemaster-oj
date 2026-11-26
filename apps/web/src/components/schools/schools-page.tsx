@@ -30,7 +30,6 @@ import { SchoolStaffImports, SchoolTeachingReports } from "./school-staff-pages"
 import { SchoolSettings } from "./school-settings";
 import { schoolWorkspaceHref, schoolWorkspaceRole } from "./school-workspace-location";
 import { PublicProblemReview, SchoolPractice, SchoolJudgeStatus } from "./school-practice";
-import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { SchoolClasses } from "./school-classes";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
 import { useLocale } from "@/components/locale-context";
@@ -107,8 +106,6 @@ export function SchoolsPage({
   const lostSchool = requestedSchoolId !== null && selected?.id !== requestedSchoolId;
   const personalSettings =
     search.get("section") === "personal-settings" || search.get("join") === "1";
-  const personalProfile = search.get("section") === "profile";
-  const personalPage = personalSettings || personalProfile;
   const schoolName = selected
     ? schoolDisplayName(selected, locale)
     : text("School workspace", "学校工作区");
@@ -134,21 +131,17 @@ export function SchoolsPage({
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
     loaded && publicBookmark ? publicBookmark
-    : loaded && requestedSection === "me" && !selected?.studentProfileId ? "/practice/me"
+    : loaded && requestedSection === "me" && !selected?.studentProfileId ? (search.get("details") === "1" ? "/practice/me?details=1" : "/practice/me")
     : loaded && user.platformAdmin && search.get("join") === "1"
       ? "/platform?section=settings#schools"
       : loaded && !selected
           ? user.platformAdmin
             ? personalSettings
               ? "/platform?section=settings#schools"
-              : personalProfile
-                ? "/platform?section=profile"
-                : "/platform"
+              : "/platform"
             : personalSettings
               ? "/practice/settings#schools"
-              : personalProfile
-                ? "/practice/profile"
-                : lostSchool ? "/practice?schoolAccess=changed" : "/practice"
+              : lostSchool ? "/practice?schoolAccess=changed" : "/practice"
           : loaded && selected && lostSchool
             ? schoolWorkspaceHref(selected.id)
             : null;
@@ -171,8 +164,8 @@ export function SchoolsPage({
     if (redirect) router.replace(redirect);
   }, [selected, redirect, router, user.id]);
   useEffect(() => {
-    document.title = `${personalSettings ? text("Settings", "设置") : personalProfile ? text("Profile", "个人资料") : schoolName} · CodeMaster`;
-  }, [schoolName, personalSettings, personalProfile, text]);
+    document.title = `${personalSettings ? text("Settings", "设置") : schoolName} · CodeMaster`;
+  }, [schoolName, personalSettings, text]);
   if (!loaded || redirect)
     return (
       <main className="min-h-screen bg-background p-6">
@@ -229,16 +222,16 @@ export function SchoolsPage({
             schoolName={schoolName}
             navigation={
               <WorkspaceNavigation
-                items={sections.map(item => ({...item, href: href(item.section), active: !personalPage && navigationSection === item.section}))}
+                items={sections.map(item => ({...item, href: href(item.section), active: !personalSettings && navigationSection === item.section}))}
               />
             }
             breadcrumb={
               <div className="flex min-w-0 items-center gap-2 text-sm">
-                {personalPage || active.section !== "home" ? (
+                {personalSettings || active.section !== "home" ? (
                   <>
                     <AppLink
                       href={href("home")}
-                      className={`${preparationPage && !personalPage ? "hidden sm:block " : ""}truncate text-muted-foreground hover:text-foreground`}
+                      className={`${preparationPage && !personalSettings ? "hidden sm:block " : ""}truncate text-muted-foreground hover:text-foreground`}
                     >
                       {text(
                         admin
@@ -249,10 +242,10 @@ export function SchoolsPage({
                         admin ? "管理工作台" : teaching ? "教师工作台" : "首页",
                       )}
                     </AppLink>
-                    <span aria-hidden="true" className={preparationPage && !personalPage ? "hidden sm:block" : undefined}>›</span>
+                    <span aria-hidden="true" className={preparationPage && !personalSettings ? "hidden sm:block" : undefined}>›</span>
                   </>
                 ) : null}
-                {!personalPage && preparationResource && (
+                {!personalSettings && preparationResource && (
                   <>
                     <AppLink href={href("exam-preparation")} className="hidden shrink-0 text-muted-foreground hover:text-foreground sm:block">
                       {teaching ? text("Exam resources", "备考资源") : text("Exam preparation", "备考中心")}
@@ -260,7 +253,7 @@ export function SchoolsPage({
                     <span aria-hidden="true" className="hidden sm:block">›</span>
                   </>
                 )}
-                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : personalProfile ? text("Profile","个人资料") : navigationLabel(active)}
+                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : navigationLabel(active)}
                   parentHref={active.section === "classes" && search.has("classId") ? href("classes") : undefined}/>
 
               </div>
@@ -282,7 +275,6 @@ export function SchoolsPage({
               <AccountMenu
                 user={user}
                 homepageHref={selected.studentProfileId ? href("me") : undefined}
-                profileHref={href("profile")}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
                 busy={logout.busy}
@@ -300,14 +292,7 @@ export function SchoolsPage({
             }
           >
             <Feedback action={logout} />
-            {personalProfile ? (
-              <PersonalWorkspaceProfile
-                user={user}
-                homepageHref={selected.studentProfileId ? href("me") : undefined}
-                schoolRoles={selected.roles}
-                onUserSaved={onUserSaved}
-              />
-            ) : personalSettings ? (
+            {personalSettings ? (
               <PersonalWorkspaceSettings
                 user={user}
                 onUserSaved={onUserSaved}

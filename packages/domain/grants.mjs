@@ -39,6 +39,8 @@ try {
     REVOKE ALL ON student_guestbook_likes,student_guestbook_mentions FROM PUBLIC,campus_worker,campus_app;
     GRANT SELECT,INSERT,DELETE ON student_guestbook_likes TO campus_app;
     GRANT SELECT,INSERT ON student_guestbook_mentions TO campus_app;
+    REVOKE ALL ON closed_guestbooks FROM PUBLIC,campus_worker,campus_app;
+    GRANT SELECT,INSERT,DELETE ON closed_guestbooks TO campus_app;
     REVOKE ALL ON learning_course_merges FROM PUBLIC,campus_worker;
     REVOKE UPDATE,DELETE ON learning_course_merges FROM campus_app;
     REVOKE ALL ON schema_migrations FROM campus_app;

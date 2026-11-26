@@ -167,6 +167,14 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
   user: CampusUser; pathname: string; search: URLSearchParams;
   onUserSaved: (user: CampusUser) => void; onLogout: () => void;
 }) {
+  // Saved links to the former profile editor open the details on the owner's homepage.
+  if ((pathname === "/platform" || pathname === "/schools") && search.get("section") === "profile") {
+    const params = new URLSearchParams(search);
+    params.set("section", "me");
+    params.set("details", "1");
+    return <LearnerWorkspaceRedirect href={pathname === "/schools" ? `/schools?${params}` : "/practice/me?details=1"}/>;
+  }
+  if (pathname === "/practice/profile") return <LearnerWorkspaceRedirect href="/practice/me?details=1"/>;
   if (pathname === "/platform") return <PlatformPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
   if (pathname === "/schools") return <SchoolsPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
   if (pathname.startsWith("/practice")) return <LearnerWorkspace user={user} pathname={pathname} onUserSaved={onUserSaved} onLogout={onLogout}/>;
@@ -176,6 +184,7 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
     const [, scope, , resourceId] = pathname.split("/");
     const query = schoolBookmarkQuery(pathname,search,schoolId);
     const target = query.get("section")!;
+    if (target === "profile" && !schoolId) return <LearnerWorkspaceRedirect href="/practice/me?details=1"/>;
     if (schoolId && resourceId && scope === "student" && (target === "problems" || target === "courses")) {
       return <ResourceBookmark schoolId={schoolId} id={resourceId} section={target} query={query.toString()}/>;
     }

@@ -15,7 +15,6 @@ import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { learnerNavigation, useWorkspaceNavigationLabel, WorkspaceNavigation } from "@/components/workspace-navigation";
 import { ApiError, productionApi, type CampusUser } from "@/lib/production-api";
-import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
 import { PublicCourseCatalog, PublicCoursePage } from "./public-course-catalog";
 import { PublicPracticeLeaderboard } from "./public-practice-leaderboard";
@@ -65,7 +64,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const scopeName = school ? schoolDisplayName(school,locale) : text("Open Platform","开放平台");
   const prep = ["paper4","acsl"].includes(section);
   const item = navigation.find(item=>item.section === section);
-  const otherLabels:Record<string,string> = {me:text("My homepage","我的主页"),profile:text("Profile","个人资料"),people:text("Profile","个人主页"),
+  const otherLabels:Record<string,string> = {me:text("My homepage","我的主页"),people:text("Profile","个人主页"),
     settings:text("Settings","设置"),leaderboard:text("Leaderboard","排行榜"),timed:text("Timed practice","限时训练"),
     paper4:text("Paper 4 past papers","Paper 4 真题练习"),acsl:text("ACSL practice","ACSL 真题练习")};
   const label = item ? navLabel(item) : otherLabels[section] ?? scopeName;
@@ -84,12 +83,8 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
       content = <div className="space-y-4">{!school && <PublicPracticePreferences/>}<PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved} onSchoolsChanged={onSchoolsChanged}/></div>;
       break;
     case "me":
-      content = <StudentPublicProfile key={school?.studentProfileId ?? user.id} ownPage
+      content = <StudentPublicProfile key={school?.studentProfileId ?? user.id} onUserSaved={onUserSaved} schoolRoles={school?.roles} detailsOpen={search.get("details") === "1"}
         profileId={school?.studentProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
-      break;
-    case "profile":
-      content = <><PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} homepageHref={homepageHref} schoolRoles={school?.roles} publicPractice={!school}/>
-        {!school && <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice" embedded/>}</>;
       break;
     case "people":
     case "leaderboard":
@@ -153,7 +148,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
             navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section)}))}/>}
             account={<><ScholarshipBalance identityId={user.id} endpoint={wallet} href={href("scholarship")}/>
               <NotificationDropdown key={school?.id ?? "public"} workspace={school ? "student" : "public"} schoolId={school?.id} scholarshipHref={href("scholarship")}/>
-              <AccountMenu user={user} homepageHref={homepageHref} profileHref={href("profile")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
+              <AccountMenu user={user} homepageHref={homepageHref} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
                 onLogout={()=>void logout.run(async()=>{try {await productionApi("auth/logout",{method:"POST"});} catch(error) {if (!(error instanceof ApiError && error.status===401)) throw error;} onLogout();})}/>
             </>}>
             <Feedback action={logout}/><section key={`${school?.id ?? "public"}:${section}:${resourceId ?? ""}:${classId ?? ""}`} className="min-w-0">{content}</section>

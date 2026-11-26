@@ -3,16 +3,15 @@ import Image from "next/image";
 import {usePathname} from "next/navigation";
 import {productionApi} from "@/lib/production-api";
 import {useEffect,useRef,useState} from "react";
-import {Settings,LogOut,ChevronDown,House,UserRound,Trophy} from "lucide-react";
+import {Settings,LogOut,ChevronDown,House,Trophy} from "lucide-react";
 import {AppLink} from "@/components/navigation";
 import type {CampusUser,CampusRole} from "@/lib/production-api";
 import {useLocale} from "@/components/locale-context";
 
-export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,homepageHref = "/practice/me",leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;profileHref?:string;homepageHref?:string;leaderboardHref?:string}) {
+export function AccountMenu({user,role,busy,onLogout,settingsHref,homepageHref = "/practice/me",leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;homepageHref?:string;leaderboardHref?:string}) {
  const {t}=useLocale();
  const pathname=usePathname();
  const settingsPath=settingsHref??(pathname.startsWith("/platform")?"/platform?section=settings":pathname.startsWith("/schools")?"/schools?section=personal-settings":role==="admin"?"/admin/personal-settings":role?`/${role}/settings`:"/practice/settings");
- const profilePath=profileHref??(pathname.startsWith("/platform")?"/platform?section=profile":pathname.startsWith("/schools")?"/schools?section=profile":role?`/${role}/profile`:"/practice/profile");
  const [open,setOpen]=useState(false);
  const [points,setPoints]=useState<{accountId:string;value:number}|null>(null);
  const showPoints = role !== "admin" && role !== "teacher" && (role === "student" || !!leaderboardHref);
@@ -40,7 +39,6 @@ export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,ho
  {open&&<div role="menu" aria-label={t("账户选项")} className="absolute right-0 top-full z-50 mt-2 w-44 max-w-[calc(100vw-32px)] rounded-lg border border-border bg-surface p-1.5 text-foreground shadow-xl" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node)&&e.relatedTarget!==trigger.current)setOpen(false);}}>
  <div className="border-b border-border px-2.5 py-2.5"><p className="break-words font-semibold">{user.nickname||user.name}</p><p className="break-all text-xs text-muted-foreground">{user.username}</p>{showPoints&&<p className="mt-2 text-sm">{t("平台积分")}：{points?.accountId===user.id?points.value:t("暂不可用")}</p>}</div>
  <AppLink role="menuitem" href={homepageHref} className={item} onNavigate={()=>setOpen(false)}><House size={16} aria-hidden="true"/>{t("我的主页")}</AppLink>
- <AppLink role="menuitem" href={profilePath} className={item} onNavigate={()=>setOpen(false)}><UserRound size={16} aria-hidden="true"/>{t("个人资料")}</AppLink>
  <AppLink role="menuitem" href={settingsPath} className={item} onNavigate={()=>setOpen(false)}><Settings size={16} aria-hidden="true"/>{t("个人设置")}</AppLink>
  {(role||leaderboardHref)&&<AppLink role="menuitem" href={leaderboardHref??`/${role}/points`} className={item} onNavigate={()=>setOpen(false)}><Trophy size={16} aria-hidden="true"/>{t("积分排行榜")}</AppLink>}
  <button role="menuitem" type="button" className={item} disabled={busy} onClick={onLogout}><LogOut size={16}/>{t(busy?"正在退出…":"退出登录")}</button>

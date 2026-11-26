@@ -8,7 +8,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import type { CampusRole, CampusUser } from "@/lib/production-api";
 import { State, date, panel, useData, useRefreshOnReturn } from "./data-state";
-import { ProfileSharingControls, type PracticeProfileSharing } from "./public-profile-sharing";
+import { ProfileEditor } from "../profile-editor";
+import type { SchoolRole } from "../schools/school-ui";
 import { ProfileGuestbook } from "./profile-guestbook";
 import { RecentSubmissions, useLearnerSubmissions } from "./recent-submissions";
 import { platformStudentProfileHref } from "../schools/school-workspace-location";
@@ -21,7 +22,6 @@ interface PublicProfile {
   scholarship?: number;
   solvedProblems?: number;
   isSelf: boolean;
-  profileEnabled?: boolean;
 }
 interface ProfileActivity {
   id: string;
@@ -51,14 +51,13 @@ function Pagination({ page, total, onChange, label, locale }: { page: number; to
   </nav>;
 }
 
-export function ProfileMessagesPanel({ sharing, children }: { sharing?: ReactNode; children?: ReactNode }) {
+function ProfileMessagesPanel({ children }: { children: ReactNode }) {
   const { locale } = useLocale();
   const headingId = useId();
   return <section className={`${panel} min-w-0`} aria-labelledby={headingId}>
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2"><MessageCircle size={18} className="text-primary"/><h3 id={headingId} className="font-bold">{ui(locale, "主页留言", "Profile messages")}</h3></div>
     </div>
-    {sharing}
     {children}
   </section>;
 }
@@ -68,10 +67,15 @@ function OwnRecentSubmissions({ schoolId, version }: { schoolId?: string; versio
   return <RecentSubmissions {...submissions}/>;
 }
 
-export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, embedded = false, ownPage = false, workspace = "student", schoolId }: { judgingHistoryHref?:string; schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; ownPage?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
+export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, onUserSaved, schoolRoles, detailsOpen, workspace = "student", schoolId }: {
+  judgingHistoryHref?: string; schoolId?: string; profileId: string; viewer: CampusUser;
+  onUserSaved?: (next: CampusUser) => void; schoolRoles?: SchoolRole[]; detailsOpen?: boolean;
+  workspace?: CampusRole | "practice" | "platform";
+}) {
+  const ownPage = Boolean(onUserSaved);
   const { locale } = useLocale();
   const practice = workspace === "practice";
-  const showActivity = !practice || embedded || ownPage;
+  const showActivity = !practice || ownPage;
   const preview = workspace === "platform";
   const schoolScope = schoolId ? `schools/${encodeURIComponent(schoolId)}/` : "";
   const base = `${practice ? "practice/" : preview ? "platform/" + schoolScope : schoolScope}profiles/${encodeURIComponent(profileId)}`;
@@ -85,40 +89,29 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, em
   const hero = ownPage && practice && person?.isSelf
     ? { avatar: viewer.avatar, nickname: viewer.nickname || viewer.name, bio: viewer.bio }
     : person;
-  const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
-  const showSharing = embedded && own;
-  const schoolSharing = useData<PracticeProfileSharing>(showSharing && !practice ? `practice/profiles/${encodeURIComponent(viewer.id)}` : "", version);
   const canWrite = practice || workspace === "student" && (Boolean(schoolId) || viewer.roles.includes("student"));
-  const publicHref = schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=${profileId}` : `/${workspace}/people/${encodeURIComponent(profileId)}`;
   const stats = person?.points !== undefined && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
     <div><dt className="text-xs text-muted-foreground">{practice ? ui(locale, "排名积分", "Ranking points") : ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
     {person.scholarship !== undefined && <div><dt className="text-xs text-muted-foreground">{ui(locale, "奖学金", "Scholarship")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.scholarship}</dd></div>}
     <div><dt className="text-xs text-muted-foreground">{ui(locale, "已解题目", "Solved problems")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div>
   </dl>;
 
-
-  return <div className={embedded ? "mt-6 space-y-5" : "space-y-5"}>
-    {embedded ? (
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">{ui(locale, "留言与解题动态", "Messages and activity")}</h2>
-        {(!practice || person?.profileEnabled) && <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>{ui(locale, "查看公开主页", "View public profile")}</AppLink>}
-      </div>
-    ) : (
-      !ownPage && <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>
-    )}
-
+  return <div className="space-y-5">
+    {!ownPage && <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>}
     <State data={profile}>
-      {embedded && stats}
-      {person && hero && !embedded && <ProfileHero avatar={hero.avatar} nickname={hero.nickname} bio={hero.bio}
-        presenceIdentityId={!schoolId && !practice ? profileId : undefined} showBio={!practice || ownPage} self={person.isSelf} selfLabel={ui(locale, "我的主页", "My homepage")} actions={person.isSelf ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=profile` : `/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
+      {person && hero && <ProfileHero avatar={hero.avatar} nickname={hero.nickname} bio={hero.bio}
+        presenceEndpoint={practice ? "practice/presence" : undefined}
+        presenceIdentityId={!schoolId && (!practice || (ownPage && person.isSelf)) ? profileId : undefined}
+        showBio={!practice || ownPage} self={person.isSelf} selfLabel={ui(locale, "我的主页", "My homepage")} actions={person.isSelf && !ownPage ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=me&details=1` : "/practice/me?details=1"} className={buttonVariants({variant:"outline"})}>{ui(locale, "个人资料", "Profile details")}</AppLink> : undefined}>
+        {person.isSelf && onUserSaved && <ProfileEditor user={viewer} schoolRoles={schoolRoles} initiallyOpen={detailsOpen}
+          onSaved={next => { onUserSaved(next); refresh(); }}/>}
         {(!practice || ownPage) && stats}
         {judgingHistoryHref && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
       </ProfileHero>}
     </State>
 
     {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
-      <ProfileMessagesPanel sharing={showSharing &&
-        <ProfileSharingControls accountId={viewer.id} resource={practice ? profile : schoolSharing}/>}>
+      <ProfileMessagesPanel>
         <ProfileGuestbook key={base} base={base} peoplePath={peoplePath} readOnly={preview} canPost={canWrite} refreshVersion={version}/>
       </ProfileMessagesPanel>
 

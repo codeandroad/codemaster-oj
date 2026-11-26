@@ -20,7 +20,6 @@ import { AccountMenu } from "@/components/account-menu";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
-import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { useLocale } from "@/components/locale-context";
 import {
   Feedback,
@@ -75,8 +74,6 @@ function PlatformAdminPage({
   const search = useSearchParams();
   const router = useRouter();
   const personalSettings = search.get("section") === "settings";
-  const personalProfile = search.get("section") === "profile";
-  const personalPage = personalSettings || personalProfile;
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const requestedSection = search.get("section") === "source-problems" ? "problems" : search.get("section") ?? "";
   const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : user.platformAdmin ? "schools" : "courses";
@@ -91,13 +88,11 @@ function PlatformAdminPage({
   const createTrigger = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const title = personalProfile
-      ? locale === "en" ? "Profile" : "个人资料"
-      : personalSettings
+    const title = personalSettings
         ? locale === "en" ? "Settings" : "设置"
         : locale === "en" ? "Platform administration" : "平台管理";
     document.title = `${title} · CodeMaster`;
-  }, [locale, personalProfile, personalSettings]);
+  }, [locale, personalSettings]);
 
   function openAction(next: PlatformSchoolAction, trigger: HTMLButtonElement) {
     lastTrigger.current = trigger;
@@ -128,9 +123,9 @@ function PlatformAdminPage({
                       key={item}
                       variant="ghost"
                       disabled={action !== null}
-                      className={`min-h-10 w-full justify-start gap-3 px-3 text-sm ${!personalPage && section === item ? "bg-accent font-semibold" : "text-muted-foreground"}`}
+                      className={`min-h-10 w-full justify-start gap-3 px-3 text-sm ${!personalSettings && section === item ? "bg-accent font-semibold" : "text-muted-foreground"}`}
                       aria-current={
-                        !personalPage && section === item
+                        !personalSettings && section === item
                           ? "page"
                           : undefined
                       }
@@ -159,9 +154,7 @@ function PlatformAdminPage({
                 <h1 className="truncate font-semibold">
                   {personalSettings
                     ? text("Settings", "设置")
-                    : personalProfile
-                      ? text("Profile", "个人资料")
-                      : profileId && schoolId ? text("Student profile", "学生主页") : text(platformSections[section].en, platformSections[section].zh)}
+                    : profileId && schoolId ? text("Student profile", "学生主页") : text(platformSections[section].en, platformSections[section].zh)}
                 </h1>
               </div>
             }
@@ -185,11 +178,6 @@ function PlatformAdminPage({
           >
             {personalSettings ? (
               <PersonalWorkspaceSettings
-                user={user}
-                onUserSaved={onUserSaved}
-              />
-            ) : personalProfile ? (
-              <PersonalWorkspaceProfile
                 user={user}
                 onUserSaved={onUserSaved}
               />

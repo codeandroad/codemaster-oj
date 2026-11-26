@@ -396,10 +396,10 @@ function CourseList({
           {resource.data?.items.map(course => <CourseCatalogRow key={course.id} course={course}
             title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => course.canManage && !course.archived ? onEdit(course.id, "school") : onOpen(course.id)}>{course.title}</button>}
             access={<span className="text-xs text-muted-foreground">{course.accessScope === "school" ? text("School-wide", "全校可学") : text("Selected classes", "指定班级")}</span>}
-            status={<>
+            status={<div className="whitespace-nowrap">
               <CourseStatus course={course}/>
               {course.hasUnpublishedChanges && <p className="mt-1 text-xs text-muted-foreground">{text("Unpublished edits", "有未发布修改")}</p>}
-            </>}
+            </div>}
             actions={<>
               <RowActionButton onClick={() => course.canManage && !course.archived ? onEdit(course.id, "school") : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</RowActionButton>
               {course.canManage && <>

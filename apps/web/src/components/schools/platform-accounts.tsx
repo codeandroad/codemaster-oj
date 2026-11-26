@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { AccountAccessAction } from "./account-access-action";
 import { PlatformPasswordReset } from "./platform-password-reset";
 import { RoleLabel, schoolDisplayName, useSchoolText, type School, type SchoolRole } from "./school-ui";
-import { schoolWorkspaceHref } from "./school-workspace-location";
+import { platformStudentProfileHref } from "./school-workspace-location";
 import { AppLink } from "@/components/navigation";
 
 type SchoolOption = Omit<School, "roles">;
@@ -286,8 +286,8 @@ function AccountDrawer({ account, onClose, onChanged }: { account: LoginAccount;
               <p className="break-words text-muted-foreground">
                 {school.identity ? <>{school.identity.name} · <span className="font-mono">{school.identity.number}</span></> : text("No linked school identity", "尚未关联校内档案")}
               </p>
-              {school.identity?.kind === "student" && !school.suspended &&
-                <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+school.identity.id}>
+              {school.identity?.kind === "student" && !school.suspended && !detail.data?.disabled &&
+                <AppLink className="text-sm font-semibold text-primary" href={platformStudentProfileHref(school.id,school.identity.id)}>
                   {text("View student profile", "查看学生主页")}</AppLink>}
               <p className="text-xs text-muted-foreground">{text("Joined", "加入时间")} <AccountTime value={school.joinedAt} /></p>
             </li>)}

@@ -5,7 +5,7 @@ import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
 import { avatarForIdentity, defaultAvatarPath } from './avatars.mjs';
 import { activeAccount, schoolRole, lockSchoolTeaching } from './schools.mjs';
-import { isPlatformAdministrator } from './platform-governance.mjs';
+import { isPlatformAdministrator, requirePlatformAdministrator } from './platform-governance.mjs';
 import { publicPracticeFirstAc, setPublicPracticeHistoryAccount } from './public-practice-records.mjs';
 import { POINTS_PER_SOLVED } from './public-practice-leaderboard.mjs';
 import { listAccountNotifications, markAccountNotificationsRead } from './account-notifications.mjs';
@@ -117,8 +117,9 @@ async function visibleMessage(db, params, messageId, { root = false, lock = fals
  return row;
 }
 
-async function profile(ctx, identityId) {
- const p = await visibleProfile(ctx.pool, ctx.user, identityId);
+async function profile(ctx, person) {
+ const identityId = person.id;
+ const isSelf = ctx.user.identityId===identityId;
  const totals = (await ctx.pool.query(`SELECT
   ((SELECT COALESCE(sum(points),0) FROM school_rank_awards WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
@@ -126,14 +127,14 @@ async function profile(ctx, identityId) {
   (SELECT count(*)::int FROM (${schoolSolvedSubjects}) solved WHERE school_id=$3 AND identity_id=$1) solved_problems,
   CASE WHEN $2::boolean OR COALESCE((SELECT (display_fields->>'scholarship')::boolean FROM school_scholarship_settings WHERE school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid),true)
    THEN COALESCE((SELECT balance FROM school_scholarship_accounts WHERE identity_id=$1),0)::int END scholarship`,
- [identityId,ctx.user.identityId===p.id || ctx.user.roles.some(role=>role==='admin'||role==='teacher'),p.school_id])).rows[0];
- return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
-  points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id,
+ [identityId,isSelf || ctx.user.roles.some(role=>role==='admin'||role==='teacher'),person.school_id])).rows[0];
+ return response({profile:{id:identityId,nickname:person.nickname,avatar:avatarForIdentity(person.avatar,identityId),bio:person.bio,
+  points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf,
   ...(totals.scholarship===null?{}:{scholarship:totals.scholarship})}});
 }
 
-async function activity(ctx, identityId) {
- const person = await visibleProfile(ctx.pool, ctx.user, identityId);
+async function activity(ctx, person) {
+ const identityId = person.id;
  const {page,pageSize} = paging(ctx.url);
  // Record the first settlement before applying visibility. A later retry must
  // neither create a second solve nor disclose a hidden first result.
@@ -237,9 +238,8 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  });
 }
 
-async function listMessages(ctx, identityId, practiceAccountId = null, threadId = null) {
+async function listMessages(ctx, identityId, practiceAccountId = null, threadId = null, readOnly = false) {
  const publicPractice=practiceAccountId!==null;
- if (!publicPractice) await visibleProfile(ctx.pool, ctx.user, identityId);
  const {page,pageSize} = paging(ctx.url);
  const own=publicPractice ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
  const params=[identityId,ctx.user.id,own,practiceAccountId];
@@ -271,7 +271,11 @@ async function listMessages(ctx, identityId, practiceAccountId = null, threadId 
  FROM totals LEFT JOIN page p ON true LEFT JOIN visible q ON q.id=p.quote_id
  ORDER BY p.created_at DESC,p.id DESC`,[...params,threadId,pageSize,(page-1)*pageSize]);
  const moderator=publicPractice ? await isPlatformAdministrator(ctx.pool,ctx.user.id) : admin(ctx.user);
- return response({items:rows.filter(row=>row.id).map(row=>messageShape(row,ctx.user,own,moderator,publicPractice)),
+ return response({items:rows.filter(row=>row.id).map(row=>{
+  const message=messageShape(row,ctx.user,own,moderator,publicPractice);
+  if (readOnly) message.canDelete=false;
+  return message;
+ }),
   total:rows[0].total,replyTotal:rows[0].reply_total,page,pageSize});
 }
 
@@ -493,6 +497,27 @@ export async function handleCommunity(ctx) {
   return handleCommunity({...ctx,route:scoped[2],pool:db,schoolId,inSchoolTransaction:true,
    user:{...ctx.user,identityId:person?.id??null,roles:[role==='school_admin'?'admin':role]}});
  });
+ const read=ctx.method==='GET' && ctx.route.match(/^(?:\/platform\/schools\/([^/]+))?\/profiles\/([^/]+)(?:\/(activity|messages(?:\/([^/]+)\/replies)?))?$/);
+ if (read) {
+  const [,previewSchool,rawIdentity,section,rawThread]=read;
+  const identityId=uuid(rawIdentity,'学生 ID');
+  const threadId=rawThread ? uuid(rawThread,'留言 ID') : null;
+  const readProfile=(context,target)=>{
+   if (!section) return profile(context,target);
+   if (section==='activity') return activity(context,target);
+   return listMessages(context,target.id,null,threadId,Boolean(previewSchool));
+  };
+  if (!previewSchool) return readProfile(ctx,await visibleProfile(ctx.pool,ctx.user,identityId));
+  const schoolId=uuid(previewSchool,'学校 ID');
+  return transaction(ctx.pool,async db=>{
+   await requirePlatformAdministrator(db,ctx.user.id);
+   await lockSchoolTeaching(db,schoolId,{shared:true});
+   await db.query("SELECT set_config('campus.school_id',$1,true)",[schoolId]);
+   const target=await activeStudent(db,identityId);
+   const viewer={...ctx.user,identityId:null,roles:[]};
+   return readProfile({...ctx,pool:db,user:viewer},target);
+  });
+ }
  const practice=ctx.route.match(/^\/practice\/profiles\/([^/]+)(?:\/(activity|messages|mentions)(?:\/([^/]+)(?:\/(replies|like))?)?)?$/);
  if (practice) return practiceProfileOperation(ctx,uuid(practice[1],'Account ID'),practice[2],
   practice[3] && uuid(practice[3],'Message ID'),practice[4]);
@@ -521,24 +546,19 @@ export async function handleCommunity(ctx) {
  if(reportAction && ctx.method==='POST') return dismissReport(ctx,uuid(reportAction[1],'举报 ID'));
  const reportList=ctx.route.match(/^\/profiles\/([^/]+)\/message-reports$/);
  if(reportList && ctx.method==='GET') return reports(ctx,uuid(reportList[1],'学生 ID'));
- const message=ctx.route.match(/^\/profiles\/([^/]+)\/messages\/([^/]+)(?:\/(replies|like))?$/);
+ const message=ctx.route.match(/^\/profiles\/([^/]+)\/messages\/([^/]+)(?:\/(like))?$/);
  if(message) {
   const identityId=uuid(message[1],'学生 ID'),messageId=uuid(message[2],'留言 ID');
-  if(message[3]==='replies' && ctx.method==='GET') return listMessages(ctx,identityId,null,messageId);
   if(message[3]==='like' && ctx.method==='POST') return reactToMessage(ctx,identityId,messageId);
   if(!message[3] && ctx.method==='DELETE') return deleteMessage(ctx,identityId,messageId);
   return null;
  }
- const section=ctx.route.match(/^\/profiles\/([^/]+)\/(activity|messages|mentions)$/);
+ const section=ctx.route.match(/^\/profiles\/([^/]+)\/(messages|mentions)$/);
  if(section) {
   const identityId=uuid(section[1],'学生 ID');
-  if(section[2]==='activity' && ctx.method==='GET') return activity(ctx,identityId);
   if(section[2]==='mentions' && ctx.method==='GET') return listMentionCandidates(ctx,identityId,null);
-  if(section[2]==='messages' && ctx.method==='GET') return listMessages(ctx,identityId);
   if(section[2]==='messages' && ctx.method==='POST') return createMessage(ctx,identityId);
   return null;
  }
- const main=ctx.route.match(/^\/profiles\/([^/]+)$/);
- if(main && ctx.method==='GET') return profile(ctx,uuid(main[1],'学生 ID'));
  return null;
 }

@@ -25,6 +25,10 @@ export function schoolWorkspaceHref(schoolId: string, section = "home", role?: S
   return `/schools?${params}`;
 }
 
+export function platformStudentProfileHref(schoolId: string, profileId: string) {
+  return `/platform?${new URLSearchParams({section: "accounts", schoolId, profileId})}`;
+}
+
 /** Resolve a saved role-based URL in the same school, including its open resource and view. */
 export function schoolBookmarkQuery(pathname: string, search: URLSearchParams, schoolId?: string | null) {
   const [, role, section = "home", id, child, detailId] = pathname.split("/");

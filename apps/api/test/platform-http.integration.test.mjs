@@ -225,6 +225,28 @@ test('explicit platform governance preserves teaching roles and enforces authori
           }
           assert.equal((await request(`${prefix}/settings`, { auth })).status, 403);
         }
+        const detail = await request('/platform/accounts/'+learner.data.user.id, {auth:platform});
+        const identity = detail.data.schools.find(item=>item.id===fresh.data.id).identity;
+        const schoolProfile = `${prefix}/profiles/${identity.id}`;
+        const preview = '/platform'+schoolProfile;
+        const visitor = await request(schoolProfile, {auth:teacher});
+        assert.equal(visitor.status,200);
+        assert.equal((await request(schoolProfile,{auth:platform})).status,404);
+        assert.equal((await request(preview)).status,401);
+        assert.equal((await request(preview,{auth:founder})).status,403);
+        const viewed = await request(preview,{auth:platform});
+        assert.equal(viewed.status,200);
+        assert.equal(viewed.data.profile.id,visitor.data.profile.id);
+        assert.equal(viewed.data.profile.isSelf,false);
+        const note = await post(schoolProfile+'/messages',learner,{body:'Hello from my profile'});
+        assert.equal(note.status,201);
+        for (const suffix of ['/activity','/messages',`/messages/${note.data.id}/replies`]) {
+          const read = await request(preview+suffix,{auth:platform});
+          assert.equal(read.status,200,suffix);
+          if (suffix==='/messages') assert.equal(read.data.items[0].id,note.data.id);
+        }
+        assert.equal((await post(preview+'/messages',platform,{body:'Read only'})).status,404);
+        assert.equal((await request(`/platform/schools/${originalSchool.id}/profiles/${identity.id}`,{auth:platform})).status,404);
         const wallet = await request(`${prefix}/scholarship/wallet`, { auth: learner });
         assert.equal(wallet.status, 200);
         assert.equal(wallet.data.balance, settings.data.initialGrant);

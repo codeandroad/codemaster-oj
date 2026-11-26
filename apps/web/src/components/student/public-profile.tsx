@@ -10,6 +10,7 @@ import type { CampusRole, CampusUser } from "@/lib/production-api";
 import { State, date, panel, useData, useRefreshOnReturn } from "./data-state";
 import { ProfileSharingControls, type PracticeProfileSharing } from "./public-profile-sharing";
 import { ProfileGuestbook } from "./profile-guestbook";
+import { platformStudentProfileHref } from "../schools/school-workspace-location";
 
 interface PublicProfile {
   nickname: string;
@@ -62,11 +63,15 @@ export function ProfileMessagesPanel({ sharing, children }: { sharing?: ReactNod
 }
 
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
-export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student", schoolId }: { schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" }) {
+export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student", schoolId }: { schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
   const { locale } = useLocale();
   const practice = workspace === "practice";
   const showActivity = !practice || embedded;
-  const base = `${practice ? "practice/" : schoolId ? `schools/${schoolId}/` : ""}profiles/${encodeURIComponent(profileId)}`;
+  const preview = workspace === "platform";
+  const schoolScope = schoolId ? `schools/${encodeURIComponent(schoolId)}/` : "";
+  const base = `${practice ? "practice/" : preview ? "platform/" + schoolScope : schoolScope}profiles/${encodeURIComponent(profileId)}`;
+  const peoplePath = preview && schoolId ? platformStudentProfileHref(schoolId, "") : schoolId
+    ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`;
   const { version, refresh } = useRefreshOnReturn();
   const profile = useData<{ profile: PublicProfile }>(base, version);
   const [activityPage, setActivityPage] = useState(1);
@@ -104,7 +109,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
     {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
       <ProfileMessagesPanel sharing={showSharing &&
         <ProfileSharingControls accountId={viewer.id} resource={practice ? profile : schoolSharing}/>}>
-        <ProfileGuestbook key={base} base={base} peoplePath={schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`} canPost={canWrite} refreshVersion={version}/>
+        <ProfileGuestbook key={base} base={base} peoplePath={peoplePath} readOnly={preview} canPost={canWrite} refreshVersion={version}/>
       </ProfileMessagesPanel>
 
       {showActivity && <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">

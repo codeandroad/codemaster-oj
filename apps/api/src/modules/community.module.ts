@@ -58,7 +58,7 @@ export class CommunityController {
  async dismissReport(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId','schools/:schoolId/profiles/:identityId','practice/profiles/:accountId'])
+ @Get(['profiles/:identityId','schools/:schoolId/profiles/:identityId','practice/profiles/:accountId','platform/schools/:schoolId/profiles/:identityId'])
  async profile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
@@ -66,11 +66,12 @@ export class CommunityController {
  async updateProfile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId/activity','schools/:schoolId/profiles/:identityId/activity','practice/profiles/:accountId/activity'])
+ @Get(['profiles/:identityId/activity','schools/:schoolId/profiles/:identityId/activity','practice/profiles/:accountId/activity','platform/schools/:schoolId/profiles/:identityId/activity'])
  async activity(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
  @Get(['profiles/:identityId/messages','schools/:schoolId/profiles/:identityId/messages','practice/profiles/:accountId/messages',
+  'platform/schools/:schoolId/profiles/:identityId/messages','platform/schools/:schoolId/profiles/:identityId/messages/:messageId/replies',
   'profiles/:identityId/messages/:messageId/replies','schools/:schoolId/profiles/:identityId/messages/:messageId/replies','practice/profiles/:accountId/messages/:messageId/replies',
   'profiles/:identityId/mentions','schools/:schoolId/profiles/:identityId/mentions','practice/profiles/:accountId/mentions'])
  async messages(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {

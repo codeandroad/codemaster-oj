@@ -37,6 +37,8 @@ import { useSchoolText } from "./school-ui";
 import { PlatformSchoolDialog } from "./platform-school-dialog";
 import { PlatformCourses } from "./platform-courses";
 import { PlatformAccounts } from "./platform-accounts";
+import { StudentPublicProfile } from "../student/public-profile";
+import { AppLink } from "@/components/navigation";
 import { PublicCourseReview } from "./public-course-review";
 import { PublicPracticeLeaderboard } from "./public-practice-leaderboard";
 import { PublicProblemReview } from "./school-practice";
@@ -78,6 +80,8 @@ function PlatformAdminPage({
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const requestedSection = search.get("section") === "source-problems" ? "problems" : search.get("section") ?? "";
   const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : user.platformAdmin ? "schools" : "courses";
+  const profileId = section === "accounts" ? search.get("profileId") : null;
+  const schoolId = search.get("schoolId");
   const setSection = (next: PlatformSection) =>
     router.push(`/platform?section=${next}`);
   const [revision, setRevision] = useState(0);
@@ -148,12 +152,16 @@ function PlatformAdminPage({
                   {text("Platform administration", "平台管理")}
                 </span>
                 <span aria-hidden="true">›</span>
+                {profileId && schoolId && <>
+                  <AppLink href="/platform?section=accounts" className="text-primary hover:underline">{text("Accounts", "账号管理")}</AppLink>
+                  <span aria-hidden="true">›</span>
+                </>}
                 <h1 className="truncate font-semibold">
                   {personalSettings
                     ? text("Settings", "设置")
                     : personalProfile
                       ? text("Profile", "个人资料")
-                      : text(platformSections[section].en, platformSections[section].zh)}
+                      : profileId && schoolId ? text("Student profile", "学生主页") : text(platformSections[section].en, platformSections[section].zh)}
                 </h1>
               </div>
             }
@@ -232,7 +240,9 @@ function PlatformAdminPage({
                         />
                       </>
                     ) : section === "accounts" ? (
-                      <PlatformAccounts />
+                      profileId && schoolId
+                        ? <StudentPublicProfile key={`${schoolId}:${profileId}`} schoolId={schoolId} profileId={profileId} viewer={user} workspace="platform" />
+                        : <PlatformAccounts />
                     ) : section === "courses" ? (
                       <PlatformCourses />
                     ) : section === "course-review" ? (

@@ -230,6 +230,7 @@ export async function createDomainServices(pool,config) {
 }
 function respond(status,body,cookie){return {status,body,...(cookie?{cookie}:{})};}
 export function resourceArea(route) {
+ if(/^\/platform\/schools\/[^/]+\/profiles(?:\/|$)/.test(route))return 'community';
  if(/^\/schools\/[^/]+\/(?:profiles|profile-message-reports)(?:\/|$)/.test(route))return 'community';
  if(/^\/schools\/[^/]+\/written-papers(?:\/|$)/.test(route))return 'writtenPapers';
  if(/^\/schools\/[^/]+\/acsl(?:\/|$)/.test(route))return 'acsl';

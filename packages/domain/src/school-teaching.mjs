@@ -1,5 +1,5 @@
 import {
-  addToClassRosters, identityClasses, identityFields, insertSchoolIdentity, readClassIds, removeFromClassRosters, replaceIdentityClasses,
+  activeStudentProfileRows, addToClassRosters, identityClasses, identityFields, insertSchoolIdentity, readClassIds, removeFromClassRosters, replaceIdentityClasses,
 } from './school-identity-record.mjs';
 import { closePendingSchoolRequests } from './school-join-requests.mjs';
 import { studentClassroom } from './student-classroom.mjs';
@@ -102,7 +102,9 @@ async function listIdentities(db, schoolId, url) {
 }
 
 async function identityRecord(db,schoolId,id) {
-  const {rows:[person]}=await db.query(`SELECT ${directoryFields},i.notes FROM school_identities i
+  const {rows:[person]}=await db.query(`SELECT ${directoryFields},i.notes,
+    EXISTS (SELECT 1 ${activeStudentProfileRows} AND i.school_id=$1 AND i.id=$2) AS "hasStudentProfile"
+    FROM school_identities i
     WHERE i.school_id=$1 AND i.id=$2`,[schoolId,id]);
   if (!person) fail(404,'NOT_FOUND','本校身份档案不存在');
   return person;

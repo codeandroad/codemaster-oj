@@ -12,6 +12,7 @@ import { validateCoverImage } from './course-access.mjs';
 import { listAccountNotifications, markAccountNotificationsRead } from './account-notifications.mjs';
 import { listStudentNotifications, markStudentNotificationsRead } from './student-notifications.mjs';
 import { listStaffCourseNotifications, markStaffCourseNotificationsRead } from './staff-course-notifications.mjs';
+import { activeStudentProfileRows } from './school-identity-record.mjs';
 
 const response = (body, status = 200) => ({status, body});
 const student = user => user.roles.includes('student');
@@ -67,10 +68,8 @@ function paging(url) {
 async function activeStudent(db, identityId) {
  const row = (await db.query(`SELECT i.id, a.id account_id,
   i.school_id, ${schoolLeaderboardName} nickname, a.avatar, a.bio
-  FROM school_identities i JOIN accounts a ON a.id=i.account_id
-  JOIN school_memberships m ON (m.school_id,m.account_id)=(i.school_id,a.id) AND m.role='student' AND m.revoked_at IS NULL
-  WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL AND i.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid
-   AND a.disabled_at IS NULL AND a.binding_released_at IS NULL`,
+  ${activeStudentProfileRows}
+  AND i.id=$1 AND i.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid`,
   [identityId])).rows[0];
  if (!row) fail(404, 'NOT_FOUND', '学生主页不存在');
  return row;

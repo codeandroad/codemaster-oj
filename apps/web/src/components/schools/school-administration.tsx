@@ -14,7 +14,7 @@ import { genderLabel } from "@/lib/gender";
 import { AppLink } from "@/components/navigation";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { SchoolClassFilter, useSchoolDirectoryOptions } from "./school-directory-filters";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -167,7 +167,7 @@ export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: 
 }) {
   const text = useSchoolText(), t = useAdminText();
   const base = `schools/${school.id}`;
-  const details = useData<DirectoryIdentity>(`${base}/identities/${identityId}/details`);
+  const details = useData<DirectoryIdentity & { hasStudentProfile: boolean }>(`${base}/identities/${identityId}/details`);
   const person = details.data;
   const [action, setAction] = useState<"classes" | "profile" | "link" | "unlink" | null>(null);
   function saved(message: string) {
@@ -179,6 +179,20 @@ export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: 
       {!action && <Drawer title={person?.name ?? text("Identity details","身份详情")}
         eyebrow={person?.number} onClose={onClose}>
         <Loading resource={details}>{person && <div className="space-y-4 text-sm">
+          {person.kind === "student" && (
+            person.hasStudentProfile ? (
+              <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })}
+                href={schoolWorkspaceHref(school.id, "leaderboard") + "&profileId=" + person.id}>
+                {text("View student profile", "查看学生主页")}
+              </AppLink>
+            ) : (
+              <p className="text-muted-foreground">{person.archivedAt
+                ? text("The student profile is unavailable because this identity is archived.", "该身份档案已归档，学生主页不可访问。")
+                : person.accountId
+                  ? text("The student profile is unavailable because the linked account or its school access is inactive.", "关联账号或本校访问已停用，学生主页不可访问。")
+                  : text("The student profile will be available after this identity is linked to an active account.", "此档案关联有效账号后，即可查看学生主页。")}</p>
+            )
+          )}
           <section className="space-y-3 rounded-md border border-border p-4">
             <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{text("Identity details","身份资料")}</h3>
               {!person.archivedAt && <Button size="sm" variant="secondary" onClick={()=>setAction("profile")}>{text("Edit profile","编辑资料")}</Button>}</div>
@@ -191,9 +205,6 @@ export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: 
             <p>{person.username || (person.archivedAt ? "—" : text("Awaiting claim","待认领"))}</p>
             <div className="flex flex-wrap items-center gap-2">
               {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
-              {!person.archivedAt && person.kind==="student" && person.accountId &&
-                <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+person.id}>
-                  {text("View student profile","查看学生主页")}</AppLink>}
               {!person.archivedAt && person.kind!=="school_admin" && <>
                 <Button size="sm" variant="secondary" onClick={()=>setAction(person.accountId ? "unlink" : "link")}>{person.accountId ? text("Unlink","解除关联") : text("Link account","关联账号")}</Button>
                 {!person.accountId && <SchoolActivationButton school={school} identity={{...person,kind:person.kind}}/>}

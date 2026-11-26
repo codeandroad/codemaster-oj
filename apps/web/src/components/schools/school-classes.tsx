@@ -1,10 +1,11 @@
 "use client";
 
-import { schoolClassApiPath } from "./school-workspace-location";
+import { schoolClassApiPath, schoolWorkspaceHref } from "./school-workspace-location";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Upload, UserPlus } from "lucide-react";
-import { inputClass, Loading, panelClass, useData } from "@/components/admin/common";
+import { Drawer, inputClass, Loading, panelClass, useData } from "@/components/admin/common";
+import { AppLink } from "@/components/navigation";
 import { Table } from "@/components/teacher/shared";
 import { Button } from "@/components/ui/button";
 import { SchoolIdentityImport } from "./school-identity-import";
@@ -439,7 +440,7 @@ function SchoolClassRosterRows({
   onEditTeacher:(teacher:RosterIdentity)=>void;
 }) {
   const text = useSchoolText();
-  const [identityId, setIdentityId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<RosterIdentity | null>(null);
   const nameButton = useRef<HTMLButtonElement>(null);
   const roster = useRef<HTMLDivElement>(null);
   const resource = useData<RosterPage>(
@@ -447,6 +448,10 @@ function SchoolClassRosterRows({
   );
   const manageable =
     !item.archived && (admin || (item.canManageStudents && kind === "student"));
+  function closeDetails() {
+    setSelected(null);
+    requestAnimationFrame(() => (nameButton.current?.isConnected ? nameButton.current : roster.current)?.focus());
+  }
   return (
     <div ref={roster} tabIndex={-1} className="min-h-40">
       <Loading resource={resource}>
@@ -470,9 +475,9 @@ function SchoolClassRosterRows({
               {staff && (
                 <td className="font-mono text-xs">{identity.number}</td>
               )}
-              <td className="font-semibold">{admin ? (
+              <td className="font-semibold">{staff ? (
                 <button type="button" aria-haspopup="dialog" className="text-left text-primary hover:underline focus-visible:underline"
-                  onClick={event => { nameButton.current = event.currentTarget; setIdentityId(identity.id); }}>
+                  onClick={event => { nameButton.current = event.currentTarget; setSelected(identity); }}>
                   {identity.name}
                 </button>
               ) : identity.name}</td>
@@ -535,14 +540,46 @@ function SchoolClassRosterRows({
           </div>
         )}
       </Loading>
-      {admin && identityId && <SchoolIdentityDetails key={identityId} school={school} identityId={identityId}
-        onClose={() => {
-          setIdentityId(null);
-          requestAnimationFrame(() => (nameButton.current?.isConnected ? nameButton.current : roster.current)?.focus());
-        }}
-        onSaved={() => { resource.reload(); onIdentityChanged(); }}/>}
+      {staff && selected && (admin
+        ? <SchoolIdentityDetails key={selected.id} school={school} identityId={selected.id} onClose={closeDetails}
+            onSaved={() => { resource.reload(); onIdentityChanged(); }}/>
+        : <TeachingRosterAccount key={selected.id} schoolId={school.id} classroom={item} identity={selected}
+            onClose={closeDetails} onRemove={() => { setSelected(null); onRemove(selected); }}/>)}
     </div>
   );
+}
+
+type RosterAccount = Pick<RosterIdentity, "id" | "kind" | "name"> & {
+  number: string; username: string | null; accountStatus: "active" | "disabled" | "unlinked";
+  schoolAccess: "active" | "suspended" | null; canRemove: boolean;
+};
+
+function TeachingRosterAccount({schoolId, classroom, identity, onClose, onRemove}: {
+  schoolId: string; classroom: SchoolClassRecord; identity: RosterIdentity; onClose: () => void; onRemove: () => void;
+}) {
+  const text = useSchoolText();
+  const resource = useData<RosterAccount>(schoolClassApiPath(`schools/${schoolId}/classes/${classroom.id}/roster/${identity.id}`));
+  const person = resource.data;
+  return <Drawer title={person?.name ?? identity.name} eyebrow={text("Account details", "账号详情")} onClose={onClose}>
+    <Loading resource={resource}>{person && <div className="space-y-5">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-sm">
+        <dt>{text("Username", "用户名")}</dt><dd className="break-all">{person.username ?? text("Not linked", "未关联")}</dd>
+        <dt>{person.kind === "student" ? text("Student ID", "学号") : text("Staff ID", "工号")}</dt><dd>{person.number}</dd>
+        <dt>{text("Role", "角色")}</dt><dd>{person.kind === "student" ? text("Student", "学生") : text("Teacher", "教师")}</dd>
+        <dt>{text("Class", "班级")}</dt><dd>{classroom.name}</dd>
+        {person.accountStatus !== "unlinked" && <><dt>{text("Platform login", "平台登录")}</dt>
+          <dd>{person.accountStatus === "active" ? text("Enabled", "已启用") : text("Disabled", "已停用")}</dd></>}
+        {person.schoolAccess && <><dt>{text("School access", "本校访问")}</dt>
+          <dd>{person.schoolAccess === "active" ? text("Active", "已开放") : text("Suspended", "已暂停")}</dd></>}
+      </dl>
+      <div className="flex flex-wrap items-center gap-3">
+        {person.kind === "student" && person.accountStatus === "active" && person.schoolAccess === "active" &&
+          <AppLink className="text-sm font-semibold text-primary hover:underline" href={schoolWorkspaceHref(schoolId,"leaderboard","teacher")+"&profileId="+person.id}>
+            {text("View student profile", "查看学生主页")}</AppLink>}
+        {person.canRemove && <Button type="button" size="sm" variant="secondary" onClick={onRemove}>{text("Remove from class", "移出班级")}</Button>}
+      </div>
+    </div>}</Loading>
+  </Drawer>;
 }
 
 export function ClassPagination({

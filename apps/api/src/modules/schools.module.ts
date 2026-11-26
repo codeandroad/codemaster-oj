@@ -31,6 +31,7 @@ export class SchoolsController {
     'schools/:schoolId/classes/:classId',
     'schools/:schoolId/classes/:classId/members',
     'schools/:schoolId/classes/:classId/roster',
+    'schools/:schoolId/classes/:classId/roster/:identityId',
     'schools/:schoolId/classes/:classId/candidates',
     'schools/:schoolId/courses',
     'schools/:schoolId/courses/:courseId',

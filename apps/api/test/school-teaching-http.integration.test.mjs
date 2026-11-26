@@ -181,6 +181,20 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.deepEqual(new Set(teacherRoster.map(person => person.id)), new Set([alphaStudent.id, alphaTeacher.id]));
       assert.equal(teacherRoster.length, 2, 'repeated roster add must not duplicate an identity');
       assert.ok(teacherRoster.every(person => !('accountId' in person)));
+      const teachingDetails = (cls,person) => roster(alpha,cls)+'/'+person.id+'?schoolRole=teacher';
+      await t.test('teaching account drawers resolve only the requested identity in an assigned class', async () => {
+        for (const [person,username] of [[alphaStudent,'pilot-student'],[alphaTeacher,'pilot-teacher']]) {
+          const {data} = await request(teachingDetails(taughtClass,person),{auth:teacher});
+          assert.deepEqual(data,{id:person.id,name:person.name,number:person.number,kind:person.kind,
+            username,accountStatus:'active',schoolAccess:'active',canRemove:person.kind==='student'});
+        }
+        await request(teachingDetails(taughtClass,alphaStudent),{status:401});
+        await request(teachingDetails(taughtClass,alphaStudent),{auth:student,status:403});
+        await request(teachingDetails(otherClass,alphaStudent),{auth:teacher,status:404});
+        await request(teachingDetails(taughtClass,betaStudent),{auth:teacher,status:404});
+        await request(teachingDetails(taughtClass,alphaStudent),{auth:betaAdmin,status:404});
+        await request(schoolPath(alpha,'accounts/'+student.id),{auth:teacher,status:403});
+      });
       await request(roster(alpha, otherClass), { auth: teacher, status: 404 });
       const studentClassItems = (await request(classes(alpha), { auth: student })).data.items;
       assert.deepEqual(studentClassItems.map(cls => cls.id), [taughtClass.id]);
@@ -244,6 +258,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.ok(!('accountId' in linkedStudent));
       await remove(`${roster(alpha, ownedClass)}/${alphaTeacher.id}`, teacher, 403);
       await remove(`${roster(alpha, ownedClass)}/${alphaStudent.id}`, teacher);
+      await request(teachingDetails(ownedClass,alphaStudent), { auth: teacher, status:404 });
       await request(roster(alpha, ownedClass), { auth: student, status: 404 });
 
       await post(roster(alpha, ownedClass), teacher, { identityId: alphaStudent.id });
@@ -263,6 +278,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await post(`${classResource(ownedClass)}/archive`, teacher, { expectedRevision: 2 }, 403);
       const { data: archivedClass } = await post(`${classResource(ownedClass)}/archive`, alphaAdmin, { expectedRevision: 2 }, 200);
       assert.equal(archivedClass.revision, 3);
+      assert.equal((await request(teachingDetails(ownedClass,alphaStudent),{auth:teacher})).data.canRemove,false);
       assert.equal(archivedClass.archived, true);
       assert.ok(!(await request(classes(alpha), { auth: teacher })).data.items.some(c => c.id === ownedClass.id));
       assert.deepEqual((await request(`${classes(alpha)}?archived=true`, { auth: teacher })).data.items.map(c => c.id), [ownedClass.id]);
@@ -298,6 +314,10 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.equal(imported[0].name, 'Imported learner');
       assert.equal(imported[0].accountLinked, false);
       assert.equal(imported[0].accountStatus, 'unlinked');
+      const unlinked = (await request(teachingDetails(ownedClass,imported[0]),{auth:teacher})).data;
+      assert.equal(unlinked.username,null);
+      assert.equal(unlinked.schoolAccess,null);
+      assert.equal(unlinked.accountStatus,'unlinked');
       const staleInput = { ...importInput, rows: [{ number: 'IMP02', name: 'Stale learner' }] };
       const { data: beforeRemoval } = await post(importPath('preview'), teacher, staleInput, 200);
       await remove(`${roster(alpha, ownedClass)}/${alphaTeacher.id}`, alphaAdmin);
@@ -669,7 +689,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
           await remove(rosterPath+'/'+dossier.id, campusAdmin);
           assert.deepEqual((await read(directory+'?view=choices')).items.map(c=>c.id), [retained.id]);
           assert.deepEqual((await read(directory)).items.map(c=>c.id), [retained.id]);
-          for (const path of [directory+'?classId='+target.id,rosterPath,targetPath+'/candidates'])
+          for (const path of [directory+'?classId='+target.id,rosterPath,rosterPath+'/'+pupil.id,targetPath+'/candidates'])
             await request(teaching(path), {auth,status:404});
           await patch(teaching(targetPath), auth, {name:'Stale rename',expectedRevision:revision},404);
           await post(teaching(rosterPath), auth, {identityId:pupil.id},404);

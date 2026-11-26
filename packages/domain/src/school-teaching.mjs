@@ -12,6 +12,8 @@ const IDENTITY_KINDS = ['student', 'teacher'];
 // A migrated administrator dossier can also be assigned as a class teacher.
 const teachingIdentity = "i.kind IN ('teacher','school_admin')";
 const rosterKind = "CASE WHEN i.kind='school_admin' THEN 'teacher' ELSE i.kind END";
+const rosterAccountStatus = `CASE WHEN i.account_id IS NULL THEN 'unlinked'
+  WHEN a.disabled_at IS NOT NULL OR a.binding_released_at IS NOT NULL THEN 'disabled' ELSE 'active' END`;
 const teacherRoster = `FROM school_class_roster r
   JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
   WHERE r.school_id = c.school_id AND r.class_id = c.id
@@ -309,8 +311,7 @@ async function listRoster(db, schoolId, actorId, role, classId, url) {
   const query = field(url.searchParams.get('q') ?? '', '搜索关键词', {min:0,max:100});
   const staffFields = role === 'student' ? '' : `, i.number, r.added_at AS "addedAt",
     i.account_id IS NOT NULL AS "accountLinked", r.can_rename AS "canRename", r.can_manage_students AS "canManageStudents",
-    CASE WHEN i.account_id IS NULL THEN 'unlinked'
-      WHEN a.disabled_at IS NOT NULL OR a.binding_released_at IS NOT NULL THEN 'disabled' ELSE 'active' END AS "accountStatus"`;
+    ${rosterAccountStatus} AS "accountStatus"`;
   const { rows } = await db.query(`SELECT i.id, ${rosterKind} AS kind, i.name ${staffFields}
     FROM school_class_roster r
     JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
@@ -319,6 +320,20 @@ async function listRoster(db, schoolId, actorId, role, classId, url) {
     AND ($6='' OR strpos(lower(i.name),lower($6))>0 ${role === 'student' ? '' : "OR strpos(lower(i.number),lower($6))>0"})
     ORDER BY i.name, i.id LIMIT $4 OFFSET $5`, [schoolId, classId, kind, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE,query]);
   return pageResult(page, rows);
+}
+
+async function rosterAccountDetails(db, schoolId, actorId, role, classId, identityId) {
+  const classroom = await requireSchoolClassManagement(db, schoolId, actorId, role, classId, {allowArchived:true});
+  const {rows:[person]} = await db.query(`SELECT i.id, i.name, i.number, ${rosterKind} AS kind,
+    a.username, ${rosterAccountStatus} AS "accountStatus",
+    CASE WHEN m.account_id IS NULL THEN NULL WHEN m.suspended THEN 'suspended' ELSE 'active' END AS "schoolAccess"
+    FROM school_class_roster r
+    JOIN school_identities i ON (i.school_id,i.id)=(r.school_id,r.identity_id)
+    LEFT JOIN accounts a ON a.id=i.account_id
+    LEFT JOIN school_memberships m ON m.school_id=i.school_id AND m.account_id=i.account_id AND (m.revoked_at IS NULL OR m.suspended)
+    WHERE r.school_id=$1 AND r.class_id=$2 AND r.identity_id=$3 AND i.archived_at IS NULL`, [schoolId,classId,identityId]);
+  if (!person) fail(404,'NOT_FOUND','班级名单中未找到该身份档案');
+  return {status:200,body:{...person,canRemove:!classroom.archived && person.kind==='student' && (role==='school_admin' || classroom.canManageStudents)}};
 }
 
 async function listCandidates(db, schoolId, actorId, role, classId, url) {
@@ -421,6 +436,9 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
     // before updating the target member, so a waiting teacher must not hold it.
     await lockSchoolTeaching(db, schoolId, { shared: method === 'GET' });
     const role = classWorkspaceRole(await schoolRole(db, schoolId, user.id), url);
+    if (method === 'GET' && action === 'roster' && rosterIdentity) {
+      return rosterAccountDetails(db, schoolId, user.id, role, classId, uuid(rosterIdentity));
+    }
     if (method === 'GET' && !rosterIdentity) {
       if (!classId) return listClasses(db, schoolId, user.id, role, url);
       if ((!action || action === 'members') && role === 'student') {

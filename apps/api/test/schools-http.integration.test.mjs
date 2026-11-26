@@ -400,6 +400,43 @@ test('school claims and reviewed applications stay within each school on the rea
       assert.equal(attempts.status,200);
       assert.equal((await post(path(beta),another,memberFacts)).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
 
+      await t.test('personal covers follow the owner across visible profiles and can be replaced or removed', async () => {
+        const schoolProfile = '/schools/'+alpha.id+'/profiles/'+local.id;
+        const preview = '/platform'+schoolProfile;
+        const practice = '/practice/profiles/'+learner.data.user.id;
+        const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHuoAAAAASUVORK5CYII=';
+        const replace = (auth,coverImage,csrf=true) => request('/account/profile-cover',{method:'PATCH',body:{coverImage},auth,csrf});
+        const read = async (path,auth) => {
+          const result = await request(path,{auth});
+          assert.equal(result.status,200);
+          return result.data.profile.coverImage;
+        };
+        const share = enabled => request(practice,{method:'PATCH',auth:learner,body:{profileEnabled:enabled}});
+        assert.equal(await read(schoolProfile,learner),undefined);
+        assert.equal((await replace(undefined,image)).status,401);
+        assert.equal((await replace(learner,image,false)).status,403);
+        assert.equal((await replace(learner,image)).status,200);
+        for (const path of [schoolProfile,practice]) assert.equal(await read(path,learner),image);
+        assert.equal(await read(schoolProfile,alphaAdmin),image);
+        assert.equal(await read(preview,platform),image);
+        assert.equal((await request(schoolProfile,{auth:another})).status,404);
+        assert.equal((await request(practice,{auth:another})).status,404);
+        assert.equal((await share(true)).status,200);
+        assert.equal(await read(practice,another),image);
+        for (const invalid of [undefined,'https://example.com/cover.jpg','data:image/jpeg;base64,YWJjZA==']) {
+          assert.equal((await replace(learner,invalid)).status,400);
+        }
+        assert.equal((await replace(another,null)).status,200);
+        assert.equal(await read(practice,another),image);
+        const next = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR42mNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==';
+        assert.equal((await replace(learner,next)).status,200);
+        assert.equal(await read(practice,another),next);
+        assert.equal((await replace(learner,null)).status,200);
+        assert.equal(await read(schoolProfile,alphaAdmin),undefined);
+        assert.equal(await read(practice,another),undefined);
+        assert.equal((await share(false)).status,200);
+      });
+
       await t.test('closing either guestbook preserves its threads and independently blocks new messages and replies', async () => {
         const settings = '/account/guestbook-settings';
         const schoolBook = '/schools/'+alpha.id+'/profiles/'+local.id+'/messages';

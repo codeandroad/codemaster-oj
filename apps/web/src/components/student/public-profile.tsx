@@ -1,14 +1,15 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
-import { Award, MessageCircle } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { Award, MessageCircle, Pencil } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { ProfileHero } from "@/components/profile-hero";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import type { CampusRole, CampusUser } from "@/lib/production-api";
 import { State, date, panel, useData, useRefreshOnReturn } from "./data-state";
-import { ProfileEditor } from "../profile-editor";
+import { ProfileDetails, ProfileEditor } from "../profile-editor";
+import { ProfileCoverEditor } from "../profile-cover-editor";
 import type { SchoolRole } from "../schools/school-ui";
 import { ProfileGuestbook } from "./profile-guestbook";
 import { RecentSubmissions, useLearnerSubmissions } from "./recent-submissions";
@@ -17,6 +18,7 @@ import { platformStudentProfileHref } from "../schools/school-workspace-location
 interface PublicProfile {
   nickname: string;
   avatar: string | null;
+  coverImage?: string;
   bio?: string | null;
   points?: number;
   scholarship?: number;
@@ -86,6 +88,13 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
   const [activityPage, setActivityPage] = useState(1);
   const activity = useData<Page<ProfileActivity>>(showActivity ? `${base}/activity?page=${activityPage}&pageSize=${pageSize}` : "", version);
   const person = profile.data?.profile;
+  const editButton = useRef<HTMLButtonElement>(null);
+  const [editState, setEditState] = useState<"view" | "editing" | "saved">("view");
+  const editing = editState === "editing";
+  function finishEditing(state: "view" | "saved") {
+    setEditState(state);
+    requestAnimationFrame(() => editButton.current?.focus());
+  }
   const hero = ownPage && practice && person?.isSelf
     ? { avatar: viewer.avatar, nickname: viewer.nickname || viewer.name, bio: viewer.bio }
     : person;
@@ -96,15 +105,29 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, on
     <div><dt className="text-xs text-muted-foreground">{ui(locale, "已解题目", "Solved problems")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div>
   </dl>;
 
+  let profileAction;
+  if (person?.isSelf && onUserSaved && !editing) {
+    profileAction = <Button ref={editButton} type="button" variant="outline" onClick={() => setEditState("editing")}>
+      <Pencil size={15} aria-hidden="true"/>{ui(locale, "编辑个人资料", "Edit profile")}
+    </Button>;
+  } else if (person?.isSelf && !ownPage) {
+    profileAction = <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=me&details=1` : "/practice/me?details=1"}
+      className={buttonVariants({variant:"outline"})}>{ui(locale, "个人资料", "Profile details")}</AppLink>;
+  }
   return <div className="space-y-5">
     {!ownPage && <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>}
     <State data={profile}>
       {person && hero && <ProfileHero avatar={hero.avatar} nickname={hero.nickname} bio={hero.bio}
         presenceEndpoint={practice ? "practice/presence" : undefined}
         presenceIdentityId={!schoolId && (!practice || (ownPage && person.isSelf)) ? profileId : undefined}
-        showBio={!practice || ownPage} self={person.isSelf} selfLabel={ui(locale, "我的主页", "My homepage")} actions={person.isSelf && !ownPage ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=me&details=1` : "/practice/me?details=1"} className={buttonVariants({variant:"outline"})}>{ui(locale, "个人资料", "Profile details")}</AppLink> : undefined}>
-        {person.isSelf && onUserSaved && <ProfileEditor user={viewer} schoolRoles={schoolRoles} initiallyOpen={detailsOpen}
-          onSaved={next => { onUserSaved(next); refresh(); }}/>}
+        coverImage={person.coverImage} coverAction={person.isSelf && ownPage && <ProfileCoverEditor coverImage={person.coverImage} onSaved={profile.reload}/>}
+        showBio={!practice || ownPage} self={person.isSelf} selfLabel={ui(locale, "我的主页", "My homepage")} actions={profileAction}>
+        {person.isSelf && onUserSaved && <>
+          <ProfileDetails user={viewer} schoolRoles={schoolRoles} initiallyOpen={detailsOpen} hidden={editing}/>
+          {editing && <ProfileEditor user={viewer} schoolRoles={schoolRoles} onCancel={() => finishEditing("view")}
+            onSaved={next => { onUserSaved(next); finishEditing("saved"); refresh(); }}/>}
+          {editState === "saved" && <p role="status" className="mt-3 text-sm text-success">{ui(locale, "个人资料已保存。", "Profile saved.")}</p>}
+        </>}
         {(!practice || ownPage) && stats}
         {judgingHistoryHref && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
       </ProfileHero>}

@@ -8,6 +8,7 @@ import { activeAccount, schoolRole, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator, requirePlatformAdministrator } from './platform-governance.mjs';
 import { publicPracticeFirstAc, setPublicPracticeHistoryAccount } from './public-practice-records.mjs';
 import { POINTS_PER_SOLVED } from './public-practice-leaderboard.mjs';
+import { validateCoverImage } from './course-access.mjs';
 import { listAccountNotifications, markAccountNotificationsRead } from './account-notifications.mjs';
 import { listStudentNotifications, markStudentNotificationsRead } from './student-notifications.mjs';
 import { listStaffCourseNotifications, markStaffCourseNotificationsRead } from './staff-course-notifications.mjs';
@@ -149,6 +150,27 @@ async function visibleMessage(db, params, messageId, { root = false, lock = fals
  return row;
 }
 
+async function profileCover(db, accountId) {
+ const {rows} = await db.query('SELECT image AS "coverImage" FROM account_profile_covers WHERE account_id=$1',[accountId]);
+ return rows[0] ?? {};
+}
+
+async function updateProfileCover(ctx) {
+ const image = validateCoverImage(ctx.body.coverImage);
+ return transaction(ctx.pool,async db=>{
+  const accountId = ctx.user.id;
+  await activeAccount(db,accountId);
+  if (image) {
+   await db.query(`INSERT INTO account_profile_covers(account_id,image) VALUES($1,$2)
+    ON CONFLICT(account_id) DO UPDATE SET image=EXCLUDED.image`,[accountId,image]);
+  } else {
+   await db.query('DELETE FROM account_profile_covers WHERE account_id=$1',[accountId]);
+  }
+  await ctx.helpers.audit(db,accountId,'account.profile_update','account',accountId,{field:'coverImage'});
+  return response({ok:true});
+ });
+}
+
 async function profile(ctx, person) {
  const identityId = person.id;
  const isSelf = ctx.user.identityId===identityId;
@@ -160,7 +182,7 @@ async function profile(ctx, person) {
   CASE WHEN $2::boolean OR COALESCE((SELECT (display_fields->>'scholarship')::boolean FROM school_scholarship_settings WHERE school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid),true)
    THEN COALESCE((SELECT balance FROM school_scholarship_accounts WHERE identity_id=$1),0)::int END scholarship`,
  [identityId,isSelf || ctx.user.roles.some(role=>role==='admin'||role==='teacher'),person.school_id])).rows[0];
- return response({profile:{id:identityId,nickname:person.nickname,avatar:avatarForIdentity(person.avatar,identityId),bio:person.bio,
+ return response({profile:{...await profileCover(ctx.pool,person.account_id),id:identityId,nickname:person.nickname,avatar:avatarForIdentity(person.avatar,identityId),bio:person.bio,
   points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf,
   ...(totals.scholarship===null?{}:{scholarship:totals.scholarship})}});
 }
@@ -250,7 +272,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  }
  if (method!=='GET') return null;
  if (section==='activity' && !own) fail(404,'NOT_FOUND','This activity is private.');
- if (!own) return response({profile:{nickname:target.nickname,avatar:defaultAvatarPath(target.alias),isSelf:false}});
+ if (!own) return response({profile:{...await profileCover(ctx.pool,accountId),nickname:target.nickname,avatar:defaultAvatarPath(target.alias),isSelf:false}});
  return withGuestbookTransaction(ctx,async db=>{
   await activeAccount(db,user.id);
   await setPublicPracticeHistoryAccount(db,user.id);
@@ -266,7 +288,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
     (SELECT solved FROM public_practice_leaderboard($1,1,1) WHERE is_own)*$3 points,
     COALESCE((SELECT balance FROM luq_accounts WHERE identity_id=$2),0)::int scholarship`,
   [user.id,user.identityId,POINTS_PER_SOLVED]);
-  return response({profile:{...stats,solvedProblems:total,nickname:target.nickname,avatar:defaultAvatarPath(target.alias),
+  return response({profile:{...await profileCover(db,accountId),...stats,solvedProblems:total,nickname:target.nickname,avatar:defaultAvatarPath(target.alias),
    isSelf:true,profileEnabled:target.enabled}});
  });
 }
@@ -525,6 +547,7 @@ async function dismissReport(ctx, reportId, publicPractice = false) {
 }
 
 export async function handleCommunity(ctx) {
+ if (ctx.route==='/account/profile-cover' && ctx.method==='PATCH') return updateProfileCover(ctx);
  if (ctx.route==='/account/guestbook-settings' && ['GET','PATCH'].includes(ctx.method)) return guestbookSettings(ctx);
  const scoped=ctx.route.match(/^\/schools\/([^/]+)(\/(?:profiles|profile-message-reports)(?:\/.*)?)$/);
  if(scoped)return transaction(ctx.pool,async db=>{

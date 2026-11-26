@@ -9,6 +9,11 @@ import { applyResponse } from '../domain.response.js';
 export class CommunityController {
  constructor(private readonly domain: DomainService) {}
 
+ @Patch('account/profile-cover')
+ async updateProfileCover(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+
  @Get('account/guestbook-settings')
  async guestbookSettings(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));

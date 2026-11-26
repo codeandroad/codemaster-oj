@@ -17,10 +17,26 @@ export function ProfileAvatar({ avatar, nickname, large = false }: { avatar?: st
   </span>;
 }
 
-export function ProfileHero({ avatar, nickname, bio, actions, children, self = false, selfLabel, presenceIdentityId, presenceEndpoint, showBio = true }: {
+export function ProfileCoverArtwork({ image }: { image?: string | null }) {
+  const { locale } = useLocale();
+  if (image) return <Image src={image} alt="" fill unoptimized className="object-cover"/>;
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-[#16355a]" aria-hidden="true">
+      <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(90deg,transparent_23px,rgba(255,255,255,.09)_24px),linear-gradient(transparent_23px,rgba(255,255,255,.09)_24px)] [background-size:24px_24px]"/>
+      <div className="absolute -right-12 -top-28 size-80 rounded-full border border-white/15 sm:right-10"/>
+      <div className="absolute -right-20 -top-20 size-80 rounded-full border border-white/15 sm:right-0"/>
+      <span className="absolute right-5 top-0 font-mono text-[110px] font-bold tracking-[-.16em] text-white/15 sm:right-16 sm:text-[145px]">{"</>"}</span>
+      <span className="absolute left-5 top-4 text-xs font-semibold tracking-wide text-white/75 sm:left-7">CodeMaster · {locale === "en" ? "Personal profile" : "个人档案"}</span>
+    </div>
+  );
+}
+
+export function ProfileHero({ avatar, nickname, bio, coverImage, coverAction, actions, children, self = false, selfLabel, presenceIdentityId, presenceEndpoint, showBio = true }: {
   avatar?: string | null;
   nickname: string;
   bio?: string | null;
+  coverImage?: string;
+  coverAction?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
   self?: boolean;
@@ -32,12 +48,9 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
 }) {
   const { locale } = useLocale();
   return <section className="overflow-hidden rounded-xl border border-border bg-surface" aria-label={locale === "en" ? `${nickname}'s profile` : `${nickname}的个人资料`}>
-    <div className="relative h-36 overflow-hidden bg-[#16355a] sm:h-40" aria-hidden="true">
-      <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(90deg,transparent_23px,rgba(255,255,255,.09)_24px),linear-gradient(transparent_23px,rgba(255,255,255,.09)_24px)] [background-size:24px_24px]"/>
-      <div className="absolute -right-12 -top-28 size-80 rounded-full border border-white/15 sm:right-10"/>
-      <div className="absolute -right-20 -top-20 size-80 rounded-full border border-white/15 sm:right-0"/>
-      <span className="absolute right-5 top-0 font-mono text-[110px] font-bold tracking-[-.16em] text-white/15 sm:right-16 sm:text-[145px]">{"</>"}</span>
-      <span className="absolute left-5 top-4 text-xs font-semibold tracking-wide text-white/75 sm:left-7">CodeMaster · {locale === "en" ? "Personal profile" : "个人档案"}</span>
+    <div className="relative h-36 sm:h-40">
+      <ProfileCoverArtwork image={coverImage}/>
+      {coverAction && <div className="absolute right-3 top-3 sm:right-5">{coverAction}</div>}
     </div>
     <div className="px-5 pb-5 sm:px-7 sm:pb-6">
       <div className="-mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">

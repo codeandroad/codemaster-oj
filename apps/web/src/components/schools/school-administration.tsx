@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import {
   Drawer, useAdminText, Feedback,
@@ -27,9 +26,7 @@ import { cn } from "@/lib/utils";
 import { SchoolIdentityImport } from "./school-identity-import";
 import { SchoolIdentityClasses, type IdentityClass } from "./school-identity-classes";
 import { OptionalIdentityFields, SchoolIdentityProfile } from "./school-identity-profile";
-import { SchoolCourses } from "./school-courses";
 import { SchoolClassPicker } from "./school-class-picker";
-import { SchoolClasses } from "./school-classes";
 import { SchoolActivationButton } from "./school-activation-button";
 import {
   RoleLabel,
@@ -38,7 +35,6 @@ import {
   type School,
 } from "./school-ui";
 
-export type SchoolSection = "members" | "identities" | "classes" | "courses";
 type IdentityKind = "student" | "teacher";
 type Identity = {
   id: string;
@@ -54,86 +50,7 @@ type ClassType = "administrative" | "training";
 type Page<T> = { items: T[]; page: number; hasMore: boolean };
 type Column<T> = { title: string; cell: (item: T) => ReactNode };
 
-export function SchoolAdministration({
-  school,
-  members,
-  refreshRevision,
-  actions,
-  navigationDisabled = false,
-  currentSection,
-}: {
-  school: School;
-  members: ReactNode;
-  refreshRevision: number;
-  actions: ReactNode;
-  navigationDisabled?: boolean;
-  currentSection?: SchoolSection;
-}) {
-  const text = useSchoolText();
-  const admin = school.roles.includes("school_admin");
-  const identityId = useSearchParams().get("identityId");
-  const [section, setSection] = useState<SchoolSection>("classes");
-  const sections = [
-    ["classes", text("Classes", "班级")],
-    ["courses", text("Courses", "课程")],
-    ["identities", text("Identities", "身份档案")],
-    ["members", text("Members", "成员")],
-  ] as const;
-  const requestedSection = currentSection ?? section;
-  const activeSection =
-    admin || requestedSection === "courses" ? requestedSection : "classes";
-  const base = `schools/${school.id}`;
-  return (
-    <div
-      className={
-        activeSection === "classes" || activeSection === "courses"
-          ? ""
-          : "rounded-lg border border-border bg-surface p-4"
-      }
-    >
-      {!currentSection && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-          <div
-            role="group"
-            aria-label={text("School sections", "学校功能")}
-            className="flex flex-wrap gap-1"
-          >
-            {(admin ? sections : sections.slice(0, 2)).map(([value, label]) => (
-              <Button
-                key={value}
-                size="sm"
-                variant={value === activeSection ? "primary" : "ghost"}
-                aria-pressed={value === activeSection}
-                disabled={navigationDisabled}
-                onClick={() => setSection(value)}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-          {actions}
-        </div>
-      )}
-      {activeSection === "members" && members}
-      {activeSection === "courses" && (
-        <SchoolCourses school={school} refreshRevision={refreshRevision} />
-      )}
-      {activeSection === "identities" && (
-        <SchoolDirectory
-          base={base}
-          school={school}
-          refreshRevision={refreshRevision}
-          highlightedIdentityId={identityId}
-        />
-      )}
-      {activeSection === "classes" && (
-        <SchoolClasses school={school} refreshRevision={refreshRevision} />
-      )}
-    </div>
-  );
-}
-
-function SchoolDirectory({
+export function SchoolDirectory({
   base,
   school,
   refreshRevision,
@@ -154,28 +71,18 @@ function SchoolDirectory({
   const [viewId,setViewId] = useState(highlightedIdentityId);
   const [archiving,setArchiving] = useState<DirectoryIdentity|null>(null);
   const options = useSchoolDirectoryOptions(school.id,archived);
-  const details = useData<DirectoryIdentity>(viewId ? base + "/identities/" + viewId + "/details" : null);
-  const person = details.data?.id === viewId ? details.data : null;
   const params = new URLSearchParams({status,q:query,archived:String(archived)});
   if(kind) params.set("kind",kind);
   if(classId) params.set("classId",classId);
   const [edit, setEdit] = useState(false);
-  const [editingClasses, setEditingClasses] = useState<string | null>(null);
-  const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [link, setLink] = useState<DirectoryIdentity | null>(null);
-  const [unlink, setUnlink] = useState<DirectoryIdentity | null>(null);
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState("");
 
   function saved(nextMessage: string) {
     setEdit(false);
-    setEditingClasses(null);
-    setEditingProfile(null);
     setImporting(false);
-    setLink(null);
-    setUnlink(null);
-    setArchiving(null); details.reload(); options.reload();
+    setArchiving(null); options.reload();
     setRevision((value) => value + 1);
     setMessage(nextMessage);
   }
@@ -225,45 +132,14 @@ function SchoolDirectory({
             {item.canArchive && <Button size="sm" variant="secondary" onClick={()=>setArchiving(item)}>{archived?text("Restore","恢复"):text("Delete","删除")}</Button>}
           </div>}
         ]}/>
-      {viewId && !editingClasses && !editingProfile && !link && !unlink && !archiving && <Drawer title={person?.name ?? text("Identity details","身份详情")}
-        eyebrow={person?.number} onClose={()=>setViewId(null)}>
-        <Loading resource={details}>{person && <div className="space-y-4 text-sm">
-          <section className="space-y-3 rounded-md border border-border p-4">
-            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{text("Identity details","身份资料")}</h3>
-              {!person.archivedAt && <Button size="sm" variant="secondary" onClick={()=>setEditingProfile(person.id)}>{text("Edit profile","编辑资料")}</Button>}</div>
-            <dl className="grid grid-cols-2 gap-3"><div><dt>{text("Gender","性别")}</dt><dd>{t(genderLabel(person.gender))}</dd></div>
-              <div><dt>{text("Classes","关联班级")}</dt><dd>{person.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"}</dd></div>
-              <div><dt>{text("Notes","备注")}</dt><dd className="whitespace-pre-wrap">{person.notes||"—"}</dd></div></dl>
-            {!person.archivedAt && person.kind!=="school_admin" && <Button size="sm" variant="secondary" onClick={()=>setEditingClasses(person.id)}>{text("Adjust classes","调整班级")}</Button>}
-          </section>
-          <section className="space-y-3 rounded-md border border-border p-4"><h3 className="font-semibold">{text("Login account","登录账号")}</h3>
-            <p>{person.username || (person.archivedAt ? "—" : text("Awaiting claim","待认领"))}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
-              {!person.archivedAt && person.kind==="student" && person.accountId &&
-                <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+person.id}>
-                  {text("View student profile","查看学生主页")}</AppLink>}
-              {!person.archivedAt && person.kind!=="school_admin" && <>
-                <Button size="sm" variant="secondary" onClick={()=>person.accountId ? setUnlink(person) : setLink(person)}>{person.accountId ? text("Unlink","解除关联") : text("Link account","关联账号")}</Button>
-                {!person.accountId && <SchoolActivationButton school={school} identity={{...person,kind:person.kind}}/>}
-              </>}
-            </div>
-          </section>
-          <section className="rounded-md border border-border p-4"><h3 className="mb-1 font-semibold">{text("Record history","历史记录")}</h3>
-            {text("Updating the profile or changing its account link preserves classes, assignments and submission history.","编辑资料或变更账号关联后，原有班级、作业和提交记录会保留。")}</section>
-        </div>}</Loading></Drawer>}
+      {viewId && !archiving && <SchoolIdentityDetails key={viewId} school={school} identityId={viewId}
+        onClose={() => setViewId(null)} onSaved={saved}/>}
       {archiving && <ConfirmSchoolAction title={archiving.archivedAt ? text("Restore identity?","恢复身份档案？") : text("Delete identity?","删除身份档案？")}
         description={archiving.name+" · "+text("The ID and class assignments are retained.","原编号与班级关联会保留。")}
         actionLabel={archiving.archivedAt?text("Restore","恢复"):text("Delete","删除")} onClose={()=>setArchiving(null)} onConfirm={async()=>{
           await productionApi(`${base}/identities/${archiving.id}/${archiving.archivedAt?"restore":"archive"}`,{method:"POST",body:{}});
           setViewId(null);saved(archiving.archivedAt?text("Identity restored.","已恢复档案。"):text("Identity deleted.","已删除档案。"));
         }}/>}
-      {editingClasses && <SchoolIdentityClasses key={editingClasses} school={school} identityId={editingClasses}
-        onClose={() => setEditingClasses(null)}
-        onSaved={() => saved(text("Class assignments saved.", "已保存班级调整。"))}/>}
-      {editingProfile && <SchoolIdentityProfile key={editingProfile} school={school} identityId={editingProfile}
-        onClose={() => setEditingProfile(null)}
-        onSaved={() => saved(text("Identity profile saved.", "已保存身份资料。"))}/>}
       {importing && (
         <SchoolIdentityImport
           initialKind={kind==="teacher" ? "teacher" : "student"}
@@ -282,34 +158,84 @@ function SchoolDirectory({
           onSaved={() => saved(text("Identity created.", "已创建身份档案。"))}
         />
       )}
-      {link && (
+    </div>
+  );
+}
+
+export function SchoolIdentityDetails({ school, identityId, onClose, onSaved }: {
+  school: School; identityId: string; onClose: () => void; onSaved: (message: string) => void;
+}) {
+  const text = useSchoolText(), t = useAdminText();
+  const base = `schools/${school.id}`;
+  const details = useData<DirectoryIdentity>(`${base}/identities/${identityId}/details`);
+  const person = details.data;
+  const [action, setAction] = useState<"classes" | "profile" | "link" | "unlink" | null>(null);
+  function saved(message: string) {
+    setAction(null);
+    details.reload();
+    onSaved(message);
+  }
+  return <>
+      {!action && <Drawer title={person?.name ?? text("Identity details","身份详情")}
+        eyebrow={person?.number} onClose={onClose}>
+        <Loading resource={details}>{person && <div className="space-y-4 text-sm">
+          <section className="space-y-3 rounded-md border border-border p-4">
+            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{text("Identity details","身份资料")}</h3>
+              {!person.archivedAt && <Button size="sm" variant="secondary" onClick={()=>setAction("profile")}>{text("Edit profile","编辑资料")}</Button>}</div>
+            <dl className="grid grid-cols-2 gap-3"><div><dt>{text("Gender","性别")}</dt><dd>{t(genderLabel(person.gender))}</dd></div>
+              <div><dt>{text("Classes","关联班级")}</dt><dd>{person.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"}</dd></div>
+              <div><dt>{text("Notes","备注")}</dt><dd className="whitespace-pre-wrap">{person.notes||"—"}</dd></div></dl>
+            {!person.archivedAt && person.kind!=="school_admin" && <Button size="sm" variant="secondary" onClick={()=>setAction("classes")}>{text("Adjust classes","调整班级")}</Button>}
+          </section>
+          <section className="space-y-3 rounded-md border border-border p-4"><h3 className="font-semibold">{text("Login account","登录账号")}</h3>
+            <p>{person.username || (person.archivedAt ? "—" : text("Awaiting claim","待认领"))}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
+              {!person.archivedAt && person.kind==="student" && person.accountId &&
+                <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"leaderboard")+"&profileId="+person.id}>
+                  {text("View student profile","查看学生主页")}</AppLink>}
+              {!person.archivedAt && person.kind!=="school_admin" && <>
+                <Button size="sm" variant="secondary" onClick={()=>setAction(person.accountId ? "unlink" : "link")}>{person.accountId ? text("Unlink","解除关联") : text("Link account","关联账号")}</Button>
+                {!person.accountId && <SchoolActivationButton school={school} identity={{...person,kind:person.kind}}/>}
+              </>}
+            </div>
+          </section>
+          <section className="rounded-md border border-border p-4"><h3 className="mb-1 font-semibold">{text("Record history","历史记录")}</h3>
+            {text("Updating the profile or changing its account link preserves classes, assignments and submission history.","编辑资料或变更账号关联后，原有班级、作业和提交记录会保留。")}</section>
+        </div>}</Loading></Drawer>}
+      {action === "classes" && <SchoolIdentityClasses school={school} identityId={identityId}
+        onClose={() => setAction(null)}
+        onSaved={() => saved(text("Class assignments saved.", "已保存班级调整。"))}/>}
+      {action === "profile" && <SchoolIdentityProfile school={school} identityId={identityId}
+        onClose={() => setAction(null)}
+        onSaved={() => saved(text("Identity profile saved.", "已保存身份资料。"))}/>}
+      {action === "link" && person && (
         <LinkAccount
           base={base}
-          identity={link}
-          onClose={() => setLink(null)}
+          identity={person}
+          onClose={() => setAction(null)}
           onSaved={() => saved(text("Account linked.", "已关联账号。"))}
         />
       )}
-      {unlink && (
+      {action === "unlink" && person && (
         <ConfirmSchoolAction
           title={text("Unlink account?", "解除账号关联？")}
           description={text(
-            `Unlink the account from ${unlink.name} at ${school.name}. Their login and school membership remain active. A teacher will lose access to the rosters assigned through this identity.`,
-            `解除 ${unlink.name} 在 ${school.name} 的账号关联。其登录账号和学校成员关系继续有效，教师将失去通过此档案获得的班级名单访问权限。`,
+            `Unlink the account from ${person.name} at ${school.name}. Their login and school membership remain active. A teacher will lose access to the rosters assigned through this identity.`,
+            `解除 ${person.name} 在 ${school.name} 的账号关联。其登录账号和学校成员关系继续有效，教师将失去通过此档案获得的班级名单访问权限。`,
           )}
           actionLabel={text("Unlink account", "解除账号关联")}
-          onClose={() => setUnlink(null)}
+          onClose={() => setAction(null)}
           onConfirm={async () => {
-            await productionApi(`${base}/identities/${unlink.id}/account`, {
+            await productionApi(`${base}/identities/${person.id}/account`, {
               method: "PATCH",
-              body: { accountId: null, expectedAccountId: unlink.accountId },
+              body: { accountId: null, expectedAccountId: person.accountId },
             });
             saved(text("Account unlinked.", "已解除账号关联。"));
           }}
         />
       )}
-    </div>
-  );
+  </>;
 }
 
 export function IdentityFilter({

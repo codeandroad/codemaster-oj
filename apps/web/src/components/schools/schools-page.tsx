@@ -60,7 +60,7 @@ import {
 import { SchoolAccountDetails, SchoolAccountFilters, SchoolRoleEditor, type AccountFilters, type Member } from "./school-account-management";
 import { SchoolJoinReview } from "./school-join-review";
 import { SchoolActivationBatch } from "./school-activation-batch";
-import { SchoolAdministration } from "./school-administration";
+import { SchoolAdministration } from "./school-administration-sections";
 import { SchoolCourses } from "./school-courses";
 import { SchoolCourseAdmissions } from "./school-course-admissions";
 import {
@@ -463,13 +463,11 @@ function MemberList({
             <thead className="border-b border-border text-muted-foreground">
               <tr>
                 <th scope="col" className="py-2 pr-3">{text("Name", "姓名")}</th>
-                <th scope="col" className="py-2 pr-3">{text("Username", "用户名")}</th>
                 <th scope="col" className="py-2 pr-3">{text("Role", "角色")}</th>
                 <th scope="col" className="py-2 pr-3">{text("Classes", "关联班级")}</th>
                 <th scope="col" className="py-2 pr-3">{text("Platform login", "平台登录")}</th>
                 <th scope="col" className="py-2 pr-3">{text("School access", "本校访问")}</th>
                 <th scope="col" className="py-2 pr-3">{text("Last sign-in", "最后登录")}</th>
-                <th scope="col" className="py-2 pr-3">{text("Last active", "最近活跃")}</th>
                 <th scope="col" className="py-2 text-right">{text("Actions", "操作")}</th>
               </tr>
             </thead>
@@ -481,9 +479,8 @@ function MemberList({
                 >
                   <td className="py-2 pr-3 break-words">
                     <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setDetail(member.accountId)}>{member.name}</button>
-                    <span className="block text-xs text-muted-foreground">{member.number}</span>
+                    <span className="block break-all text-xs text-muted-foreground">{member.username}</span>
                   </td>
-                  <td className="py-2 pr-3 font-mono">{member.username}</td>
                   <td className="py-2 pr-3">
                     <RoleLabel role={member.role} />
                     {member.administrator && member.role !== "school_admin" && (
@@ -497,9 +494,6 @@ function MemberList({
                   <td className="whitespace-nowrap py-2 pr-3">{member.suspended ? text("Suspended", "已暂停") : text("Active", "已开放")}</td>
                   <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
                     {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN") : "—"}
-                  </td>
-                  <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
-                    {member.lastActiveAt ? <time dateTime={member.lastActiveAt}>{new Date(member.lastActiveAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN")}</time> : "—"}
                   </td>
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
@@ -522,7 +516,7 @@ function MemberList({
               {!members.data?.items.length && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={7}
                     className="py-6 text-center text-muted-foreground"
                   >
                     {text("No members on this page.", "本页没有成员。")}

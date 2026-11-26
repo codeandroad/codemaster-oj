@@ -1,13 +1,14 @@
 "use client";
 
 import { schoolClassApiPath } from "./school-workspace-location";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Upload, UserPlus } from "lucide-react";
 import { inputClass, Loading, panelClass, useData } from "@/components/admin/common";
 import { Table } from "@/components/teacher/shared";
 import { Button } from "@/components/ui/button";
 import { SchoolIdentityImport } from "./school-identity-import";
+import { SchoolIdentityDetails } from "./school-administration";
 import {
   SchoolClassEditor,
   SchoolClassRosterPicker,
@@ -225,6 +226,7 @@ function SchoolClassList({
               query={query.trim()}
               staff={staff}
               admin={admin}
+              onIdentityChanged={reloadClasses}
               onEdit={() => setEditing(current)}
               onRefresh={() => onRefresh(current.id)}
             />
@@ -266,6 +268,7 @@ function SchoolClassRoster({
   item, query, kind, onKind,
   staff,
   admin,
+  onIdentityChanged,
   onEdit,
   onRefresh,
 }: {
@@ -276,6 +279,7 @@ function SchoolClassRoster({
   onKind:(kind:RosterKind)=>void;
   staff: boolean;
   admin: boolean;
+  onIdentityChanged: () => void;
   onEdit: () => void;
   onRefresh: () => void;
 }) {
@@ -381,6 +385,7 @@ function SchoolClassRoster({
         onPage={setPage}
         staff={staff}
         admin={admin}
+        onIdentityChanged={onIdentityChanged}
         query={query}
         onEditTeacher={setEditingTeacher}
         onRemove={setAction}
@@ -418,6 +423,7 @@ function SchoolClassRosterRows({
   onPage,
   staff,
   admin,
+  onIdentityChanged,
   onRemove, query, onEditTeacher,
 }: {
   school: School;
@@ -427,18 +433,22 @@ function SchoolClassRosterRows({
   onPage: (page: number) => void;
   staff: boolean;
   admin: boolean;
+  onIdentityChanged: () => void;
   onRemove: (identity: RosterIdentity) => void;
   query:string;
   onEditTeacher:(teacher:RosterIdentity)=>void;
 }) {
   const text = useSchoolText();
+  const [identityId, setIdentityId] = useState<string | null>(null);
+  const nameButton = useRef<HTMLButtonElement>(null);
+  const roster = useRef<HTMLDivElement>(null);
   const resource = useData<RosterPage>(
     schoolClassApiPath(`schools/${school.id}/classes/${item.id}/roster?kind=${kind}&page=${page}&q=${encodeURIComponent(query)}`, staff && !admin),
   );
   const manageable =
     !item.archived && (admin || (item.canManageStudents && kind === "student"));
   return (
-    <div className="min-h-40">
+    <div ref={roster} tabIndex={-1} className="min-h-40">
       <Loading resource={resource}>
         <Table
           headers={[
@@ -460,7 +470,12 @@ function SchoolClassRosterRows({
               {staff && (
                 <td className="font-mono text-xs">{identity.number}</td>
               )}
-              <td className="font-semibold">{identity.name}</td>
+              <td className="font-semibold">{admin ? (
+                <button type="button" aria-haspopup="dialog" className="text-left text-primary hover:underline focus-visible:underline"
+                  onClick={event => { nameButton.current = event.currentTarget; setIdentityId(identity.id); }}>
+                  {identity.name}
+                </button>
+              ) : identity.name}</td>
               {staff && (
                 <td>
                   <span
@@ -520,6 +535,12 @@ function SchoolClassRosterRows({
           </div>
         )}
       </Loading>
+      {admin && identityId && <SchoolIdentityDetails key={identityId} school={school} identityId={identityId}
+        onClose={() => {
+          setIdentityId(null);
+          requestAnimationFrame(() => (nameButton.current?.isConnected ? nameButton.current : roster.current)?.focus());
+        }}
+        onSaved={() => { resource.reload(); onIdentityChanged(); }}/>}
     </div>
   );
 }

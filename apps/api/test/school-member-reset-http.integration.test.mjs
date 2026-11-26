@@ -158,13 +158,19 @@ test('platform administrators recover member logins while school administrators 
         const filtered = await request(directory+'?q=S01&role=student&className=Reset&status=enabled', {auth:admin});
         assert.equal(filtered.status, 200);
         assert.deepEqual(filtered.data.items.map(item => item.accountId), [memberId]);
+        const heartbeat = new Date(Date.now()+2000).toISOString();
+        await pool.query('UPDATE sessions SET presence_seen_at=$2 WHERE account_id=$1',[memberId,heartbeat]);
         const detail = await request(directory+'/'+memberId, {auth:admin});
         assert.equal(detail.status, 200);
         assert.equal(detail.data.username,'reset-member');
+        assert.equal(detail.data.lastActiveAt,heartbeat);
+        assert.ok(Date.parse(detail.data.lastLoginAt)<Date.parse(heartbeat));
         assert.deepEqual(detail.data.classes,['Reset class']);
         assert.deepEqual(detail.data.events.filter(event=>event.action==='account.reset_issue').map(event=>event.action),['account.reset_issue'], 'only the historical school issuance is visible here');
         assert.equal((await request(directory+'?role=teacher&q=S01',{auth:admin})).data.items.length,0);
-        assert.equal((await request(directory+'/'+personal.data.user.id,{auth:admin})).data.lastLoginAt,null);
+        const restricted = (await request(directory+'/'+personal.data.user.id,{auth:admin})).data;
+        assert.equal(restricted.lastLoginAt,null);
+        assert.equal(restricted.lastActiveAt,null);
       });
       await t.test('only local delegates and unlinked base roles are editable, preserving roster identities', async () => {
         const path = `/schools/${schoolId}/accounts/`;

@@ -17,7 +17,7 @@ import { SchoolIdentityProfile } from "./school-identity-profile";
 export type Member = {
   accountId: string; username: string; name: string; number: string | null;
   role: SchoolRole; administrator: boolean; classes: string[];
-  disabled: boolean; suspended: boolean; canManageAccess: boolean; joinedAt: string; lastLoginAt: string | null;
+  disabled: boolean; suspended: boolean; canManageAccess: boolean; joinedAt: string; lastLoginAt: string | null; lastActiveAt: string | null;
   canEditRoles: boolean; identityId: string | null; gender: CampusGender | null;
 };
 

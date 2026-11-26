@@ -6,6 +6,7 @@ import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { provisionSchool } from '../src/schools.mjs';
 import { handleSchoolScholarship, configureSchoolActivityScholarshipRule } from '../src/school-scholarship.mjs';
+import { handleCommunity } from '../src/community.mjs';
 import { handleSchoolLeaderboard } from '../src/school-leaderboard.mjs';
 import { schoolActivitiesOperation } from '../src/school-activities.mjs';
 import { schoolPracticeOperation } from '../src/school-practice.mjs';
@@ -39,6 +40,27 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
   await t.test('solution before receipt excludes scholarship but preserves AC ranking points',async()=>{await submit('one',p);await finish();assert.equal((await call('one','wallet')).balance,97);assert.equal((await owner.query('SELECT points FROM school_rank_awards WHERE school_id=$1 AND identity_id=$2',[alpha.id,ids.one])).rows[0].points,10);});
   await t.test('unlock is not delivery; receiving answer while already judging does not cancel first AC',async()=>{await content(q,'FULL_SOLUTION');await unlock('one',q,'FULL_SOLUTION');await submit('one',q);await provide('one',q,'FULL_SOLUTION');await finish();assert.equal((await call('one','wallet')).balance,93);const r=(await owner.query('SELECT assisted FROM school_scholarship_receipts WHERE school_id=$1 AND identity_id=$2 AND subject_key=$3',[alpha.id,ids.one,'problem:'+q.problemId])).rows[0];assert.equal(r.assisted,false);});
   await t.test('duplicate and concurrent AC jobs, replayed callbacks and rejudge never duplicate awards',async()=>{await Promise.all([submit('two',q),submit('two',q)]);const a=await finish(),b=await finish();assert.equal((await call('two','wallet')).balance,104);await owner.query("UPDATE school_judge_jobs SET result=result WHERE school_id=$1 AND id=ANY($2::uuid[])",[alpha.id,[a.id,b.id]]);assert.equal((await call('two','wallet')).balance,104);await owner.query("UPDATE school_judge_jobs SET result=jsonb_set(result,'{status}','\"WA\"') WHERE school_id=$1 AND id=$2",[alpha.id,a.id]);assert.equal((await call('two','wallet')).balance,104);assert.equal((await owner.query('SELECT count(*)::int n FROM school_scholarship_review_cases')).rows[0].n,1);});
+  await t.test('the linked school profile uses the ranking name and settled first AC across repeated jobs',async()=>{
+   const route=`/schools/${alpha.id}/profiles/${ids.two}`;
+   const read=async(viewer,path=route,query='')=>(await handleCommunity({pool:app,user:users[viewer],route:path,
+    method:'GET',url:new URL('http://qa.local'+path+query)})).body;
+   const activity=route+'/activity';
+   await assert.rejects(read('outsider'),e=>e.status===404);
+   assert.equal((await read('admin')).profile.nickname,'two');
+   await owner.query('UPDATE accounts SET nickname=$2 WHERE id=$1',[users.two.id,'Custom']);
+   assert.equal((await read('one')).profile.nickname,'two');
+   await owner.query('UPDATE accounts SET leaderboard_use_nickname=true WHERE id=$1',[users.two.id]);
+   assert.equal((await read('admin')).profile.nickname,'Custom');
+   assert.equal((await read('admin')).profile.solvedProblems,1);
+   const feed=await read('admin',activity);
+   assert.equal(feed.total,1);
+   assert.deepEqual([feed.items[0].problemId,feed.items[0].problemTitle,feed.items[0].points],[q.problemId,'Second',10]);
+   assert.deepEqual((await read('admin',activity,'?pageSize=1&page=2')).items,[]);
+   await owner.query('UPDATE school_problems SET published=false WHERE school_id=$1 AND id=$2',[alpha.id,q.problemId]);
+   assert.equal((await read('admin',activity)).total,0);
+   assert.equal((await read('two',activity)).total,1);
+   await owner.query('UPDATE school_problems SET published=true WHERE school_id=$1 AND id=$2',[alpha.id,q.problemId]);
+  });
   await t.test('batch replay freezes recipients and cross-school grant is rejected atomically',async()=>{const req=randomUUID(),body={identityIds:[ids.one,ids.two],amount:7,reason:'Learning award',requestId:req};await Promise.all([call('admin','grant','POST',body),call('admin','grant','POST',body)]);assert.equal((await call('two','wallet')).balance,111);await assert.rejects(call('admin','grant','POST',{...body,amount:8}),e=>e.status===409);await assert.rejects(call('admin','grant','POST',{identityIds:[ids.one,randomUUID()],amount:9,reason:'Invalid',requestId:randomUUID()}),e=>e.status===404);assert.equal((await call('one','wallet')).balance,100);});
   await t.test('competing purchases cannot overdraw, missing version cannot reuse old body',async()=>{const x=await problem('Expensive A'),y=await problem('Expensive B');await content(x,'FULL_SOLUTION');await content(y,'FULL_SOLUTION');await call('teacher','policies','POST',{targets:[x,y],kind:'FULL_SOLUTION',price:70,mode:'paid'});const outcomes=await Promise.allSettled([unlock('two',x,'FULL_SOLUTION'),unlock('two',y,'FULL_SOLUTION')]);assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);assert.equal((await call('two','wallet')).balance,41);const v=randomUUID();await owner.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) SELECT school_id,$3,id,2,draft FROM school_problems WHERE school_id=$1 AND id=$2',[alpha.id,p.problemId,v]);await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,p.problemId,v]);assert.equal((await quote('one',{...p,versionId:v},'FULL_SOLUTION')).available,false);await assert.rejects(provide('one',p,'FULL_SOLUTION'),e=>e.status===404);});
   await t.test('runtime roles prevent ledger overwrite, missing-scope reads and worker wallet access',async()=>{for(const table of ['school_scholarship_accounts','school_scholarship_ledger','school_scholarship_contents','school_scholarship_claims','school_rank_awards']){assert.equal((await app.query(`SELECT * FROM ${table}`)).rowCount,0);await assert.rejects(worker.query(`SELECT * FROM ${table}`),e=>e.code==='42501');}await assert.rejects(app.query('UPDATE school_scholarship_accounts SET balance=999'),e=>e.code==='42501');await assert.rejects(app.query('DELETE FROM school_scholarship_ledger'),e=>e.code==='42501');await assert.rejects(owner.query('UPDATE school_scholarship_ledger SET reason=reason'),/append-only/);assert.deepEqual((await owner.query('SELECT count(*)::int count,sum(delta)::int total FROM luq_ledger')).rows[0],legacyBefore);});

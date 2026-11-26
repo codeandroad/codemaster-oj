@@ -27,24 +27,28 @@ const sourceAccess = `p.owner_scope='platform' AND p.archived_at IS NULL AND b.a
 
 // Editorial permission selects a course. Assigning its exercises also requires a
 // published edition that the receiving school can use outside the course.
-const assignmentSourceAccess = `${sourceAccess}
+const assignmentSourceAccess = (school = '$2') => `${sourceAccess}
  AND NOT v.course_only_published AND v.rank_review_status='approved' AND v.school_visible_at IS NOT NULL
- AND (b.school_id=$2 OR EXISTS (SELECT 1 FROM school_problem_publications publication
+ AND (b.school_id=${school} OR EXISTS (SELECT 1 FROM school_problem_publications publication
    WHERE publication.school_id=b.catalog_scope_id AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL)
- OR EXISTS (SELECT 1 FROM platform_problem_audiences audience WHERE audience.problem_id=p.id AND audience.school_id=$2))`;
+ OR EXISTS (SELECT 1 FROM platform_problem_audiences audience WHERE audience.problem_id=p.id AND audience.school_id=${school}))`;
+
+// Assignment snapshots can exist without publishing the platform problem into a school bank.
+export const schoolCatalogActivityTitle = `(SELECT v.title FROM ${sourceTables}
+ WHERE p.id=j.problem_id AND ${assignmentSourceAccess('j.school_id')})`;
 
 export async function assignmentCatalogOptions(db, schoolId, linkedIds) {
  if (!linkedIds.length) return [];
  const {rows} = await db.query(`SELECT p.id AS "problemId",v.id AS "versionId",v.title,v.mode,
    coalesce(presentation.metadata,v.metadata)->>'difficulty' AS difficulty,'platform' AS "bankId",'CodeMaster' AS "bankName"
    FROM ${sourceTables} LEFT JOIN problem_public_statements presentation ON presentation.version_id=v.id
-   WHERE p.id=ANY($1::uuid[]) AND ${assignmentSourceAccess} ORDER BY v.title,p.id`, [linkedIds,schoolId]);
+   WHERE p.id=ANY($1::uuid[]) AND ${assignmentSourceAccess()} ORDER BY v.title,p.id`, [linkedIds,schoolId]);
  return rows;
 }
 
 export async function prepareAssignmentEdition(db, schoolId, {problemId,versionId}) {
  const {rows} = await db.query(`SELECT ${sourceColumns} FROM ${sourceTables}
-   WHERE p.id=$1 AND v.id=$3 AND ${assignmentSourceAccess} FOR SHARE OF p,b,v`, [problemId,schoolId,versionId]);
+   WHERE p.id=$1 AND v.id=$3 AND ${assignmentSourceAccess()} FOR SHARE OF p,b,v`, [problemId,schoolId,versionId]);
  const [source] = await studentPublicStatementRows(db,rows);
  if (!source || source.public_statement_pending) fail(404,'PROBLEM_UNAVAILABLE','所选平台题目版本不可布置，请刷新题目列表。');
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[problemId]);

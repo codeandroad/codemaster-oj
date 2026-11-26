@@ -1,3 +1,6 @@
+import { schoolActivityJobVisibleSql } from './school-activities.mjs';
+import { schoolCatalogActivityTitle } from './catalog-problem-publication.mjs';
+import { schoolLeaderboardName, schoolSolvedSubjects } from './school-leaderboard.mjs';
 import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
 import { avatarForIdentity, defaultAvatarPath } from './avatars.mjs';
@@ -30,7 +33,7 @@ function paging(url) {
 
 async function activeStudent(db, identityId) {
  const row = (await db.query(`SELECT i.id, a.id account_id,
-  COALESCE(NULLIF(btrim(a.nickname),''),'同学') nickname, a.avatar, a.bio
+  i.school_id, ${schoolLeaderboardName} nickname, a.avatar, a.bio
   FROM school_identities i JOIN accounts a ON a.id=i.account_id
   JOIN school_memberships m ON (m.school_id,m.account_id)=(i.school_id,a.id) AND m.role='student' AND m.revoked_at IS NULL
   WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL AND i.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid
@@ -120,40 +123,59 @@ async function profile(ctx, identityId) {
   ((SELECT COALESCE(sum(points),0) FROM school_rank_awards WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE identity_id=$1))::int points,
-  ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
-   +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems,
+  (SELECT count(*)::int FROM (${schoolSolvedSubjects}) solved WHERE school_id=$3 AND identity_id=$1) solved_problems,
   CASE WHEN $2::boolean OR COALESCE((SELECT (display_fields->>'scholarship')::boolean FROM school_scholarship_settings WHERE school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid),true)
    THEN COALESCE((SELECT balance FROM school_scholarship_accounts WHERE identity_id=$1),0)::int END scholarship`,
- [identityId,ctx.user.identityId===p.id || ctx.user.roles.some(role=>role==='admin'||role==='teacher')])).rows[0];
+ [identityId,ctx.user.identityId===p.id || ctx.user.roles.some(role=>role==='admin'||role==='teacher'),p.school_id])).rows[0];
  return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
   points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id,
   ...(totals.scholarship===null?{}:{scholarship:totals.scholarship})}});
 }
 
 async function activity(ctx, identityId) {
- await visibleProfile(ctx.pool, ctx.user, identityId);
+ const person = await visibleProfile(ctx.pool, ctx.user, identityId);
  const {page,pageSize} = paging(ctx.url);
- // A reward is the immutable first-AC event. Other users may only see titles
- // from currently school-visible, published problems. Never join private test
- // results or unpublished timed submissions into the public timeline.
- const visibility = `FROM point_ledger l
-  JOIN submissions s ON s.id=l.submission_id
-  JOIN problems p ON p.id=l.problem_id
-  JOIN problem_banks b ON b.id=p.bank_id
-  JOIN problem_versions v ON v.id=s.version_id
-  WHERE s.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid AND l.identity_id=$1 AND l.reason='first_ac'
-   AND ($2::boolean OR (b.visibility='school' AND b.archived_at IS NULL
-   AND p.archived_at IS NULL AND v.published_at IS NOT NULL
-   AND v.school_visible_at IS NOT NULL))
+ // Record the first settlement before applying visibility. A later retry must
+ // neither create a second solve nor disclose a hidden first result.
+ const events = `WITH candidates AS (
+  SELECT l.id::text id,l.problem_id,v.title,coalesce(rank.points,0) points,l.created_at,
+   ($2 OR (b.visibility='school' AND b.archived_at IS NULL AND p.archived_at IS NULL
+    AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL))
    AND (s.timed_attempt_id IS NULL OR EXISTS (
     SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
-    WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))`;
- const params = [identityId,ctx.user.identityId===identityId];
- const total = (await ctx.pool.query(`SELECT count(*)::int total ${visibility}`,params)).rows[0].total;
- const rows = (await ctx.pool.query(`SELECT l.id,l.problem_id,v.title,
-  COALESCE((SELECT r.points FROM school_rank_ledger r WHERE r.submission_id=l.submission_id),0) points,l.created_at
-  ${visibility} ORDER BY l.created_at DESC,l.id DESC LIMIT $3 OFFSET $4`,
-  [...params,pageSize,(page-1)*pageSize])).rows;
+    WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL)) visible
+  FROM point_ledger l JOIN submissions s ON s.id=l.submission_id
+  JOIN problems p ON p.id=l.problem_id JOIN problem_banks b ON b.id=p.bank_id
+  JOIN problem_versions v ON v.id=s.version_id
+  LEFT JOIN school_rank_ledger rank ON rank.submission_id=l.submission_id
+  WHERE s.school_id=$3 AND l.identity_id=$1 AND l.reason='first_ac'
+  UNION ALL
+  SELECT j.id::text,j.problem_id,CASE
+   WHEN $2 THEN v.definition->>'title'
+   WHEN p.archived_at IS NULL AND NOT bank.archived THEN CASE
+    WHEN bank.resource_kind='ordinary' AND p.published THEN published.definition->>'title'
+    WHEN bank.resource_kind='publication' THEN ${schoolCatalogActivityTitle} END
+   END,award.points,result.recorded_at,${schoolActivityJobVisibleSql('j')}
+  FROM school_scholarship_receipts receipt
+  JOIN school_scholarship_results result USING(school_id,source_kind,job_id,subject_key)
+  JOIN school_rank_awards award USING(school_id,identity_id,subject_key)
+  JOIN school_judge_jobs j ON (j.school_id,j.id)=(receipt.school_id,receipt.job_id)
+  JOIN school_problem_versions v ON (v.school_id,v.problem_id,v.id)=(j.school_id,j.problem_id,j.version_id)
+  JOIN school_problems p ON (p.school_id,p.id)=(j.school_id,j.problem_id)
+  JOIN school_problem_banks bank ON (bank.school_id,bank.id)=(p.school_id,p.bank_id)
+  LEFT JOIN school_problem_versions published ON (published.school_id,published.problem_id,published.id)=
+    (p.school_id,p.id,p.published_version_id)
+  WHERE receipt.school_id=$3 AND receipt.identity_id=$1 AND receipt.source_kind='problem'
+   AND result.status='AC' AND j.kind='submit' AND j.access_context='school'
+ ), first_ac AS (SELECT DISTINCT ON (problem_id) * FROM candidates ORDER BY problem_id,created_at,id)
+ SELECT * FROM first_ac WHERE visible AND title IS NOT NULL`;
+ const params = [identityId,ctx.user.identityId===identityId,person.school_id];
+ const {rows:[pageData]} = await ctx.pool.query(`WITH visible AS MATERIALIZED (${events}),
+  page AS (SELECT * FROM visible ORDER BY created_at DESC,id DESC LIMIT $4 OFFSET $5)
+  SELECT (SELECT count(*)::int FROM visible) total,
+   coalesce(jsonb_agg(page ORDER BY created_at DESC,id DESC),'[]') items FROM page`,
+  [...params,pageSize,(page-1)*pageSize]);
+ const {total,items:rows}=pageData;
  return response({items:rows.map(r=>({id:String(r.id),type:'first_ac',problemId:r.problem_id,
   problemTitle:r.title,points:r.points,createdAt:r.created_at})),total,page,pageSize});
 }

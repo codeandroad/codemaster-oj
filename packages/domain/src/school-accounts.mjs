@@ -41,10 +41,15 @@ async function readAccounts(db, schoolId, accountId, url, actorId) {
     false AS "canResetPassword",
     (a.id<>$8 AND ${editableRoles}) AS "canEditRoles",
     m.suspended, (a.id<>$8 AND (m.suspended OR (${unprotectedMember}))) AS "canManageAccess",
-    CASE WHEN ${canViewLegacyLastLogin} THEN a.last_login_at END AS "lastLoginAt",
+    CASE WHEN access.show_login THEN a.last_login_at END AS "lastLoginAt",
+    CASE WHEN access.show_login THEN greatest(a.last_login_at,
+      (SELECT max(s.presence_seen_at) FROM sessions s WHERE s.account_id=a.id),
+      (SELECT max(j.created_at) FROM school_judge_jobs j WHERE j.school_id=m.school_id AND j.account_id=a.id
+        AND j.identity_id=si.id AND j.access_context='school')) END AS "lastActiveAt",
     ARRAY(SELECT c.name FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
       WHERE r.school_id=m.school_id AND r.identity_id=si.id AND c.archived_at IS NULL ORDER BY c.name,c.id) AS classes
     ${accountDirectory}
+    CROSS JOIN LATERAL (SELECT ${canViewLegacyLastLogin} AS show_login) access
     WHERE m.school_id=$1 AND ${presentMembership} AND ($2::uuid IS NULL OR a.id=$2)
       AND ($9='all' OR m.suspended=($9='suspended'))
       AND ($3='' OR strpos(lower(coalesce(si.name,i.name)),lower($3))>0 OR strpos(a.username,lower($3))>0 OR strpos(lower(si.number),lower($3))>0)
@@ -127,7 +132,10 @@ export async function handleSchoolAccounts({ pool, user, route, method, url, bod
   return transaction(pool, async db => {
     await lockSchoolTeaching(db, schoolId, {shared:method==='GET'});
     await requireSchoolAdmin(db, schoolId, user.id);
-    if (!match[3] && method==='GET') return { status:200, body:await readAccounts(db,schoolId,accountId,url,user.id) };
+    if (!match[3] && method==='GET') {
+      await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
+      return { status:200, body:await readAccounts(db,schoolId,accountId,url,user.id) };
+    }
     if (match[3]==='access' && method==='PATCH') {
       await setSchoolAccess(db,schoolId,accountId,user.id,body.suspended);
       return {status:200,body:{ok:true}};

@@ -471,14 +471,15 @@ function MemberList({
             </caption>
             <thead className="border-b border-border text-muted-foreground">
               <tr>
-                <th className="py-2 pr-3">{text("Name", "姓名")}</th>
-                <th className="py-2 pr-3">{text("Username", "用户名")}</th>
-                <th className="py-2 pr-3">{text("Role", "角色")}</th>
-                <th className="py-2 pr-3">{text("Classes", "关联班级")}</th>
-                <th className="py-2 pr-3">{text("Platform login", "平台登录")}</th>
-                <th className="py-2 pr-3">{text("School access", "本校访问")}</th>
-                <th className="py-2 pr-3">{text("Last sign-in", "最后登录")}</th>
-                <th className="py-2 text-right">{text("Actions", "操作")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Name", "姓名")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Username", "用户名")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Role", "角色")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Classes", "关联班级")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Platform login", "平台登录")}</th>
+                <th scope="col" className="py-2 pr-3">{text("School access", "本校访问")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Last sign-in", "最后登录")}</th>
+                <th scope="col" className="py-2 pr-3">{text("Last active", "最近活跃")}</th>
+                <th scope="col" className="py-2 text-right">{text("Actions", "操作")}</th>
               </tr>
             </thead>
             <tbody>
@@ -506,6 +507,9 @@ function MemberList({
                   <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
                     {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN") : "—"}
                   </td>
+                  <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
+                    {member.lastActiveAt ? <time dateTime={member.lastActiveAt}>{new Date(member.lastActiveAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN")}</time> : "—"}
+                  </td>
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
                       {member.canEditRoles && <Button variant="secondary" size="sm" onClick={() => setEditingRoles(member)}>{text("Edit roles", "编辑角色")}</Button>}
@@ -527,7 +531,7 @@ function MemberList({
               {!members.data?.items.length && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="py-6 text-center text-muted-foreground"
                   >
                     {text("No members on this page.", "本页没有成员。")}

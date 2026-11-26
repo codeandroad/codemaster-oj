@@ -3,6 +3,14 @@ import { transaction } from './db.mjs';
 import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, field, integer, uuid } from './security.mjs';
 import { schoolScholarshipSettings } from './school-scholarship.mjs';
+// Both the school ranking and the linked profile use these school-scoped identities and solves.
+export const schoolLeaderboardName = `CASE WHEN a.leaderboard_use_nickname AND btrim(a.nickname)<>''
+ THEN a.nickname ELSE i.name END`;
+export const schoolSolvedSubjects = `SELECT school_id,identity_id,subject_key FROM school_rank_awards
+ UNION SELECT s.school_id,l.identity_id,'problem:'||l.problem_id FROM point_ledger l
+ JOIN submissions s ON s.id=l.submission_id WHERE l.reason='first_ac'
+ UNION SELECT a.school_id,l.identity_id,'paper4:'||l.paper_id||':'||l.question_key FROM paper4_rank_ledger l
+ JOIN school_paper4_attempts a ON a.id=l.attempt_id AND a.identity_id=l.identity_id`;
 export async function handleSchoolLeaderboard({pool,user,route,method,url}){
  const m=route.match(/^\/schools\/([^/]+)\/leaderboard$/);if(!m)return null;if(method!=='GET')return null;const s=uuid(m[1]);
  return transaction(pool,async db=>{
@@ -22,11 +30,10 @@ export async function handleSchoolLeaderboard({pool,user,route,method,url}){
    UNION ALL SELECT identity_id,points FROM acsl_point_awards WHERE school_id=$1
    UNION ALL SELECT award.identity_id,award.points FROM paper4_rank_ledger award JOIN school_paper4_attempts a ON a.id=award.attempt_id AND a.school_id=$1),
   points AS (SELECT identity_id,sum(points)::integer points FROM awards GROUP BY identity_id),
-  solves AS (SELECT identity_id,count(DISTINCT subject_key)::integer solved FROM (
-    SELECT identity_id,subject_key FROM school_rank_awards WHERE school_id=$1
-    UNION ALL SELECT l.identity_id,'problem:'||l.problem_id FROM point_ledger l JOIN submissions s ON s.id=l.submission_id WHERE s.school_id=$1 AND l.reason='first_ac'
-   ) solved GROUP BY identity_id),
-  members AS (SELECT i.id,i.name,a.id AS account_id,a.avatar,CASE WHEN a.leaderboard_use_nickname AND btrim(a.nickname)<>'' THEN a.nickname ELSE i.name END display_name,
+  solves AS (SELECT identity_id,count(*)::integer solved FROM (
+    ${schoolSolvedSubjects}
+   ) solved WHERE school_id=$1 GROUP BY identity_id),
+  members AS (SELECT i.id,i.name,a.id AS account_id,a.avatar,${schoolLeaderboardName} display_name,
     coalesce(p.points,0) points,coalesce(sc.solved,0) solved,coalesce(st.attempts,0) attempts,coalesce(st.assessed,0) assessed,CASE WHEN coalesce(st.assessed,0)=0 THEN 0 ELSE st.accepted::numeric/st.assessed END ac_rate,coalesce(w.balance,0) balance
    ,EXISTS(SELECT 1 FROM sessions s WHERE s.account_id=a.id AND s.expires_at>statement_timestamp()
      AND (s.presence_seen_at>statement_timestamp()-interval '90 seconds' OR s.public_presence_seen_at>statement_timestamp()-interval '90 seconds')) online

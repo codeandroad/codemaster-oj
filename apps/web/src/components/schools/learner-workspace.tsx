@@ -26,6 +26,7 @@ import { schoolDisplayName, useSchoolText, type School } from "./school-ui";
 import { useLocale } from "../locale-context";
 import { PageHeadingProvider, useCurrentPageHeading } from "../page-heading-context";
 import { useWorkspaceData } from "../workspace-data";
+import { useLearnerSubmissions } from "../student/recent-submissions";
 import { StudentDashboardView } from "../student/dashboard-view";
 import { StudentClass, StudentClasses } from "../student/classes";
 import { AcslPage } from "../acsl/acsl-page";
@@ -60,10 +61,11 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const navigation = learnerNavigation(school?.id);
   const href = (key:string) => school ? schoolWorkspaceHref(school.id,key === "settings" ? "personal-settings" : key)
     : key === "home" ? "/practice" : `/practice/${key}`;
+  const homepageHref = school?.studentProfileId ? href("me") : "/practice/me";
   const scopeName = school ? schoolDisplayName(school,locale) : text("Open Platform","开放平台");
   const prep = ["paper4","acsl"].includes(section);
   const item = navigation.find(item=>item.section === section);
-  const otherLabels:Record<string,string> = {profile:text("Profile","个人资料"),people:text("Profile","个人主页"),
+  const otherLabels:Record<string,string> = {me:text("My homepage","我的主页"),profile:text("Profile","个人资料"),people:text("Profile","个人主页"),
     settings:text("Settings","设置"),leaderboard:text("Leaderboard","排行榜"),timed:text("Timed practice","限时训练"),
     paper4:text("Paper 4 past papers","Paper 4 真题练习"),acsl:text("ACSL practice","ACSL 真题练习")};
   const label = item ? navLabel(item) : otherLabels[section] ?? scopeName;
@@ -81,8 +83,12 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
     case "settings":
       content = <div className="space-y-4">{!school && <PublicPracticePreferences/>}<PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved} onSchoolsChanged={onSchoolsChanged}/></div>;
       break;
+    case "me":
+      content = <StudentPublicProfile key={school?.studentProfileId ?? user.id} ownPage
+        profileId={school?.studentProfileId ?? user.id} schoolId={school?.id} viewer={user} workspace={school ? "student" : "practice"}/>;
+      break;
     case "profile":
-      content = <><PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} schoolRoles={school?.roles} publicPractice={!school}/>
+      content = <><PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} homepageHref={homepageHref} schoolRoles={school?.roles} publicPractice={!school}/>
         {!school && <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice" embedded/>}</>;
       break;
     case "people":
@@ -147,7 +153,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
             navigation={<WorkspaceNavigation items={navigation.map(item=>({...item,active:item.section===(prep ? "exam-preparation" : section)}))}/>}
             account={<><ScholarshipBalance identityId={user.id} endpoint={wallet} href={href("scholarship")}/>
               <NotificationDropdown key={school?.id ?? "public"} workspace={school ? "student" : "public"} schoolId={school?.id} scholarshipHref={href("scholarship")}/>
-              <AccountMenu user={user} profileHref={href("profile")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
+              <AccountMenu user={user} homepageHref={homepageHref} profileHref={href("profile")} settingsHref={href("settings")} leaderboardHref={href("leaderboard")} busy={logout.busy}
                 onLogout={()=>void logout.run(async()=>{try {await productionApi("auth/logout",{method:"POST"});} catch(error) {if (!(error instanceof ApiError && error.status===401)) throw error;} onLogout();})}/>
             </>}>
             <Feedback action={logout}/><section key={`${school?.id ?? "public"}:${section}:${resourceId ?? ""}:${classId ?? ""}`} className="min-w-0">{content}</section>
@@ -175,11 +181,9 @@ function PublicStudyHome({ user }: { user: CampusUser }) {
   const text = useSchoolText();
   const schools = useData<{ items: School[] }>("schools");
   const schoolAccessChanged = useSearchParams().get("schoolAccess") === "changed";
-  const submissions = useData<{items:{id:string;schoolId:string;problemId:string;problemTitle:string;status:string;score:number|null}[]}>("practice/submissions");
+  const submissions = useLearnerSubmissions();
   return <StudentDashboardView heading={text(`Hello, ${user.name}`, `你好，${user.name}`)}
-    submissionsState={submissions} submissionsHref="/practice/submissions"
-    submissions={(submissions.data?.items ?? []).map(item => ({...item,title:item.problemTitle,
-      href:`/practice/submissions?${new URLSearchParams({submissionId:item.id,submissionSchoolId:item.schoolId})}`}))}
+    {...submissions}
     featured={<>
       {schoolAccessChanged && <p role="status" className={panelClass}>{text("Your school workspace is no longer available.", "你的账号已无法进入原学校工作区。")}</p>}
       <div className={`${panelClass} flex flex-wrap items-center justify-between gap-3 p-4`}>

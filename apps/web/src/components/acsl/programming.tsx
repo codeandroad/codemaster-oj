@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
+import { schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
 import { useLocale } from "@/components/locale-context";
 import { Loading } from "@/components/admin/common";
 import {
@@ -337,6 +338,7 @@ function ProgrammingWorkspace({
       account: () => (
         <AccountMenu
           user={user}
+          homepageHref={schoolWorkspaceHref(path.split("/")[1], "me")}
           busy={loggingOut}
           onLogout={() => setLogoutOpen(true)}
         />

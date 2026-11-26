@@ -11,6 +11,7 @@ export type School = {
   nameZh?: string | null;
   nameEn?: string | null;
   roles: SchoolRole[];
+  studentProfileId?: string | null;
 };
 export function schoolDisplayName(
   school: Pick<School, "name" | "nameZh" | "nameEn">,

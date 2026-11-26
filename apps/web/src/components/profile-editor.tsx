@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { Camera, Pencil, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button } from "./ui/button";
+import { Button, buttonVariants } from "./ui/button";
+import { AppLink } from "./navigation";
 import { ProfileAvatar, ProfileHero } from "./profile-hero";
 import type { PresenceEndpoint } from "./student/student-presence";
 import { DEFAULT_AVATARS, defaultAvatarPath, randomDefaultAvatarPath } from "@/lib/default-avatars";
@@ -28,13 +29,14 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   </div>;
 }
 
-export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboard = false, presenceEndpoint = "presence", roleLabel }: {
+export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboard = false, presenceEndpoint = "presence", roleLabel, homepageHref }: {
   user: CampusUser;
   onSaved?: (next: CampusUser) => void;
   personal?: boolean;
   publicLeaderboard?: boolean;
   presenceEndpoint?: PresenceEndpoint;
   roleLabel?: ReactNode;
+  homepageHref?: string;
 }) {
   const { locale } = useLocale();
   const [editing, setEditing] = useState(false);
@@ -109,7 +111,10 @@ export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboa
 
   return <div className="mt-5 space-y-4">
     <h1 className="sr-only">{ui(locale, "个人资料", "Profile")}</h1>
-    <ProfileHero avatar={editing ? avatar : user.avatar} nickname={displayName} bio={editing ? bio : user.bio} presenceIdentityId={presenceIdentityId} presenceEndpoint={presenceEndpoint} scope={personal ? "personal" : "school"} self selfLabel={ui(locale, "我的资料", "My profile")} actions={editing ? undefined : <Button type="button" variant="outline" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={15}/>{ui(locale, "编辑个人资料", "Edit profile")}</Button>}>
+    <ProfileHero avatar={editing ? avatar : user.avatar} nickname={displayName} bio={editing ? bio : user.bio} presenceIdentityId={presenceIdentityId} presenceEndpoint={presenceEndpoint} scope={personal ? "personal" : "school"} self selfLabel={ui(locale, "我的资料", "My profile")} actions={editing ? undefined : <>
+      {homepageHref && <AppLink href={homepageHref} className={buttonVariants({variant:"secondary"})}>{ui(locale, "查看我的主页", "View my homepage")}</AppLink>}
+      <Button type="button" variant="outline" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={15}/>{ui(locale, "编辑个人资料", "Edit profile")}</Button>
+    </>}>
       <p className="mt-4 text-xs leading-5 text-muted-foreground">{personal ? ui(locale, "更新头像、昵称和个人介绍。", "Update your avatar, nickname and bio.") : ui(locale, "昵称、头像和介绍对校内用户可见。排行榜默认显示姓名，可在下方编辑资料时改为显示昵称。", "Your nickname, avatar, and bio are visible to school users. The leaderboard uses your full name unless you enable nickname display below.")}</p>
     </ProfileHero>
 

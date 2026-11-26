@@ -10,6 +10,7 @@ import type { CampusRole, CampusUser } from "@/lib/production-api";
 import { State, date, panel, useData, useRefreshOnReturn } from "./data-state";
 import { ProfileSharingControls, type PracticeProfileSharing } from "./public-profile-sharing";
 import { ProfileGuestbook } from "./profile-guestbook";
+import { RecentSubmissions, useLearnerSubmissions } from "./recent-submissions";
 import { platformStudentProfileHref } from "../schools/school-workspace-location";
 
 interface PublicProfile {
@@ -62,11 +63,15 @@ export function ProfileMessagesPanel({ sharing, children }: { sharing?: ReactNod
   </section>;
 }
 
-/** Public information is always loaded from the public profile API, never from private CampusUser fields. */
-export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, embedded = false, workspace = "student", schoolId }: { judgingHistoryHref?:string; schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
+function OwnRecentSubmissions({ schoolId, version }: { schoolId?: string; version: number }) {
+  const submissions = useLearnerSubmissions(schoolId, version);
+  return <RecentSubmissions {...submissions}/>;
+}
+
+export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, embedded = false, ownPage = false, workspace = "student", schoolId }: { judgingHistoryHref?:string; schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; ownPage?: boolean; workspace?: CampusRole | "practice" | "platform" }) {
   const { locale } = useLocale();
   const practice = workspace === "practice";
-  const showActivity = !practice || embedded;
+  const showActivity = !practice || embedded || ownPage;
   const preview = workspace === "platform";
   const schoolScope = schoolId ? `schools/${encodeURIComponent(schoolId)}/` : "";
   const base = `${practice ? "practice/" : preview ? "platform/" + schoolScope : schoolScope}profiles/${encodeURIComponent(profileId)}`;
@@ -77,6 +82,9 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, em
   const [activityPage, setActivityPage] = useState(1);
   const activity = useData<Page<ProfileActivity>>(showActivity ? `${base}/activity?page=${activityPage}&pageSize=${pageSize}` : "", version);
   const person = profile.data?.profile;
+  const hero = ownPage && practice && person?.isSelf
+    ? { avatar: viewer.avatar, nickname: viewer.nickname || viewer.name, bio: viewer.bio }
+    : person;
   const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
   const showSharing = embedded && own;
   const schoolSharing = useData<PracticeProfileSharing>(showSharing && !practice ? `practice/profiles/${encodeURIComponent(viewer.id)}` : "", version);
@@ -96,13 +104,14 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, em
         {(!practice || person?.profileEnabled) && <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>{ui(locale, "查看公开主页", "View public profile")}</AppLink>}
       </div>
     ) : (
-      <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>
+      !ownPage && <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>
     )}
 
     <State data={profile}>
       {embedded && stats}
-      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={!schoolId && !practice ? profileId : undefined} showBio={!practice} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=profile` : `/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
-        {!practice && stats}
+      {person && hero && !embedded && <ProfileHero avatar={hero.avatar} nickname={hero.nickname} bio={hero.bio}
+        presenceIdentityId={!schoolId && !practice ? profileId : undefined} showBio={!practice || ownPage} self={person.isSelf} selfLabel={ui(locale, "我的主页", "My homepage")} actions={person.isSelf ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=profile` : `/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
+        {(!practice || ownPage) && stats}
         {judgingHistoryHref && <AppLink className={buttonVariants({variant:"secondary",className:"mt-4"})} href={judgingHistoryHref}>{ui(locale,"完整判题记录","Complete judging history")}</AppLink>}
       </ProfileHero>}
     </State>
@@ -127,5 +136,6 @@ export function StudentPublicProfile({ judgingHistoryHref, profileId, viewer, em
       </section>}
 
     </div>}
+    {ownPage && person?.isSelf && <OwnRecentSubmissions schoolId={schoolId} version={version}/>}
   </div>;
 }

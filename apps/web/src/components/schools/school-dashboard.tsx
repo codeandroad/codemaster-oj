@@ -1,27 +1,12 @@
 "use client";
 
 import { useData } from "@/components/student/shared";
+import { useLearnerSubmissions } from "@/components/student/recent-submissions";
 import { StudentDashboardView } from "@/components/student/dashboard-view";
 import type { CampusUser } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
 import type { CourseDetail, CoursePage, SchoolCourse } from "./school-courses-model";
 import type { SchoolActivity } from "./school-activities-model";
-
-export type SchoolSubmission = {
-  id: string;
-  problemId: string;
-  problemTitle: string;
-  language: string;
-  state: string;
-  createdAt: string;
-  status: string;
-  score: number | null;
-};
-type SubmissionPage = {
-  items: SchoolSubmission[];
-  page: number;
-  hasMore: boolean;
-};
 
 export function SchoolStudentDashboard({ school, user }: { school: School; user: CampusUser }) {
   const text = useSchoolText();
@@ -29,7 +14,7 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
   const href = (section: string, detail: Record<string, string> = {}) =>
     `/schools?${new URLSearchParams({ schoolId: school.id, section, ...detail })}`;
   const assignments = useData<{ items: SchoolActivity[] }>(`${base}/activities?kind=assignment`);
-  const submissions = useData<SubmissionPage>(`${base}/submissions`);
+  const submissions = useLearnerSubmissions(school.id);
   const courses = useData<CoursePage<SchoolCourse>>(`${base}/courses`);
 
   const assignmentItems = assignments.data?.items ?? [];
@@ -69,15 +54,6 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
         completed: Boolean(chapter.read),
       })) : [],
     } : undefined}
-    submissionsState={submissions}
-    submissionsHref={href("submissions")}
-    submissions={(submissions.data?.items ?? []).map(submission => ({
-      id: submission.id,
-      problemId: submission.problemId,
-      title: submission.problemTitle,
-      href: href("submissions", { submissionId: submission.id }),
-      status: submission.status,
-      score: submission.score,
-    }))}
+    {...submissions}
   />;
 }

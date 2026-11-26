@@ -15,6 +15,7 @@ const sections: Record<string, Label> = {
   "/practice/scholarship": ["我的奖学金", "Scholarship"],
   "/practice/settings": ["个人设置", "Personal settings"],
   "/practice/profile": ["个人资料", "Profile"],
+  "/practice/me": ["我的主页", "My homepage"],
   "/activate": ["加入学校", "Join a school"],
   "/platform": ["平台管理", "Platform administration"],
   "/schools": ["学校工作区", "School workspaces"],

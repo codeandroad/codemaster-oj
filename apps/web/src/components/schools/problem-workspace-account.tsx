@@ -18,7 +18,7 @@ export function ProblemWorkspaceAccount({ user, schoolId, dirty, staff = false, 
   return <>
     {!staff && <ScholarshipBalance identityId={user.id} endpoint={wallet} href={publicWallet ? "/practice/scholarship" : href("scholarship")}/>}
     {!staff && <NotificationDropdown workspace={schoolId ? "student" : "public"} schoolId={schoolId ?? undefined} scholarshipHref={href("scholarship")}/>}
-    <AccountMenu user={user} busy={action.busy} profileHref={href("profile")} settingsHref={href(schoolId ? "personal-settings" : "settings")} leaderboardHref={href("leaderboard")}
+    <AccountMenu user={user} busy={action.busy} homepageHref={staff ? undefined : href("me")} profileHref={href("profile")} settingsHref={href(schoolId ? "personal-settings" : "settings")} leaderboardHref={href("leaderboard")}
       onLogout={() => {
         if (dirty && !window.confirm(locale === "en" ? "Your code has not been submitted. Sign out with the draft saved locally?" : "代码尚未提交，草稿保留在本机。确认退出登录？")) return;
         void action.run(async () => {

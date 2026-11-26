@@ -134,6 +134,7 @@ export function SchoolsPage({
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
     loaded && publicBookmark ? publicBookmark
+    : loaded && requestedSection === "me" && !selected?.studentProfileId ? "/practice/me"
     : loaded && user.platformAdmin && search.get("join") === "1"
       ? "/platform?section=settings#schools"
       : loaded && !selected
@@ -183,7 +184,7 @@ export function SchoolsPage({
       </main>
     );
   if (!selected) return null;
-  if (!teaching) return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
+  if (!teaching || requestedSection === "me") return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
   const members = (
     <SchoolMembers
       school={selected}
@@ -280,6 +281,7 @@ export function SchoolsPage({
                 workspace={teaching ? "staff" : "student"} scholarshipHref={href("scholarship")}/>
               <AccountMenu
                 user={user}
+                homepageHref={selected.studentProfileId ? href("me") : undefined}
                 profileHref={href("profile")}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
@@ -301,6 +303,7 @@ export function SchoolsPage({
             {personalProfile ? (
               <PersonalWorkspaceProfile
                 user={user}
+                homepageHref={selected.studentProfileId ? href("me") : undefined}
                 schoolRoles={selected.roles}
                 onUserSaved={onUserSaved}
               />

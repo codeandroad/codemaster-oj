@@ -112,7 +112,15 @@ test('school claims and reviewed applications stay within each school on the rea
       const claim={...facts,schoolSlug:beta.slug,activationCode:issue.data.activationCode};
       assert.equal((await post('/auth/claim-identity',learner,claim,false)).status,403);
       assert.equal((await post('/auth/claim-identity',learner,claim)).status,200);
-      assert.deepEqual(new Set((await request('/schools',{auth:learner})).data.items.map(s=>s.id)),new Set([alpha.id,beta.id]));
+      const joinedSchools = (await request('/schools',{auth:learner})).data.items;
+      assert.deepEqual(Object.fromEntries(joinedSchools.map(s=>[s.id,s.studentProfileId])),{
+        [alpha.id]:local.id, [beta.id]:foreign.id,
+      });
+      for (const school of joinedSchools) {
+        const self = await request(`/schools/${school.id}/profiles/${school.studentProfileId}`, {auth:learner});
+        assert.equal(self.data.profile.isSelf,true);
+      }
+      assert.equal((await request('/schools',{auth:alphaAdmin})).data.items[0].studentProfileId,null);
       assert.equal((await decide(beta,pending.data.id,betaAdmin,'approved',foreign.id)).status,409);
       assert.equal((await request('/schools/join-requests',{auth:learner})).data.items.find(r=>r.id===pending.data.id).status,'superseded');
       assert.equal((await request('/auth/me',{auth:learner})).data.user.id,learner.data.user.id);

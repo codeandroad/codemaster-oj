@@ -10,17 +10,20 @@ export function PersonalWorkspaceProfile({
   user,
   onUserSaved,
   schoolRoles,
+  homepageHref = "/practice/me",
   publicPractice = false,
 }: {
   user: CampusUser;
   onUserSaved: (user: CampusUser) => void;
   schoolRoles?: SchoolRole[];
+  homepageHref?: string;
   publicPractice?: boolean;
 }) {
   return (<>
     <ProfileEditor
       user={user}
       personal
+      homepageHref={homepageHref}
       publicLeaderboard={publicPractice}
       presenceEndpoint={publicPractice ? "practice/presence" : undefined}
       onSaved={onUserSaved}
